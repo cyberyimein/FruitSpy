@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="FruitSpy icon">
+  <rect width="64" height="64" rx="14" fill="#f4f6f5"/>
+  <path d="M32 12c8 0 14 6 14 14 0 13-12 26-14 26S18 39 18 26c0-8 6-14 14-14z" fill="#2f8f7d"/>
+  <path d="M34 10c5-2 10 0 12 5-5 1-9 0-12-5z" fill="#7db9ad"/>
+</svg>
