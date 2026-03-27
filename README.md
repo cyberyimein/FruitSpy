@@ -6,6 +6,7 @@ FruitSpy is a lightweight macOS host and Docker runtime dashboard for LAN use.
 
 - Host CPU, memory, and storage usage (updates every second)
 - Running Docker containers with CPU and memory usage (updates every second)
+- Installed host packages from npm, Homebrew, pip, and uv with search
 - Per-container recent logs on demand
 - One-click jump to Portainer
 

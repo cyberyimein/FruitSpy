@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import ConnectionIndicator from './components/ConnectionIndicator';
 import ContainerPanel from './components/ContainerPanel';
 import HostDashboard from './components/HostDashboard';
+import PackageInventoryPanel from './components/PackageInventoryPanel';
 import { DashboardSocket, type ConnectionState } from './lib/socket';
 import type { RuntimeConfig, Snapshot } from './lib/types';
 
@@ -66,6 +67,7 @@ export default function App() {
 
             <main>
                 <HostDashboard host={snapshot.host} />
+                <PackageInventoryPanel host={snapshot.host} updatedAt={updatedAt} />
                 <ContainerPanel
                     containers={snapshot.containers}
                     dockerAvailable={snapshot.docker_available}

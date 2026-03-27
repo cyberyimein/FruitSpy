@@ -11,10 +11,11 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import load_runtime_config
-from app.models.schemas import Snapshot
+from app.models.schemas import PackageInventory, Snapshot
 from app.services.docker_logs import DockerLogsService
 from app.services.docker_metrics import DockerMetricsService
 from app.services.host_metrics import HostMetricsService
+from app.services.package_inventory import PackageInventoryService
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = PROJECT_ROOT / "backend"
@@ -41,6 +42,7 @@ RUNTIME_CONFIG = load_runtime_config()
 host_service = HostMetricsService(storage_path=RUNTIME_CONFIG.storage_path)
 docker_service = DockerMetricsService(base_url=RUNTIME_CONFIG.docker_base_url)
 logs_service = DockerLogsService(base_url=RUNTIME_CONFIG.docker_base_url)
+package_inventory_service = PackageInventoryService()
 
 app = FastAPI(title="FruitSpy")
 app.add_middleware(
@@ -89,6 +91,11 @@ def container_logs(
     tail: int = Query(default=RUNTIME_CONFIG.log_lines, ge=20, le=1000),
 ) -> dict:
     return logs_service.tail(container_id=container_id, lines=tail)
+
+
+@app.get("/api/packages")
+def package_inventory() -> PackageInventory:
+    return package_inventory_service.collect()
 
 
 @app.websocket("/ws/dashboard")

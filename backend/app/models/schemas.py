@@ -32,3 +32,25 @@ class Snapshot(BaseModel):
     containers: list[ContainerMetrics] = Field(default_factory=list)
     docker_available: bool = True
     docker_error: Optional[str] = None
+
+
+class PackageRecord(BaseModel):
+    manager: str
+    name: str
+    version: str
+    source: str
+
+
+class PackageManagerInventory(BaseModel):
+    manager: str
+    available: bool = True
+    command: Optional[str] = None
+    package_count: int = 0
+    error: Optional[str] = None
+    packages: list[PackageRecord] = Field(default_factory=list)
+
+
+class PackageInventory(BaseModel):
+    timestamp: float
+    total_packages: int = 0
+    managers: list[PackageManagerInventory] = Field(default_factory=list)
