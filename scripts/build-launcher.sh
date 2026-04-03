@@ -5,6 +5,8 @@ ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT_DIR/dist/FruitSpy.app"
 MACOS_DIR="$APP_DIR/Contents/MacOS"
 RESOURCES_DIR="$APP_DIR/Contents/Resources"
+BUNDLED_SCRIPTS_DIR="$RESOURCES_DIR/scripts"
+BUNDLED_RUNTIME_DIR="$RESOURCES_DIR/runtime"
 FRONTEND_ICON_SVG="$ROOT_DIR/frontend/public/favicon.svg"
 
 build_icns_from_favicon() {
@@ -49,7 +51,13 @@ build_icns_from_favicon() {
   return 0
 }
 
-mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
+if [[ ! -d "$ROOT_DIR/runtime/backend/app" ]]; then
+  echo "Bundled runtime is missing. Run scripts/build-app.sh first." >&2
+  exit 1
+fi
+
+rm -rf "$APP_DIR"
+mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$BUNDLED_SCRIPTS_DIR" "$BUNDLED_RUNTIME_DIR"
 
 swiftc \
   -framework AppKit \
@@ -59,7 +67,9 @@ swiftc \
   -o "$MACOS_DIR/FruitSpyLauncher"
 
 cp "$ROOT_DIR/launcher/Info.plist" "$APP_DIR/Contents/Info.plist"
-cp "$ROOT_DIR/scripts/launcher.sh" "$RESOURCES_DIR/launcher.sh"
+cp "$ROOT_DIR/scripts/launcher.sh" "$BUNDLED_SCRIPTS_DIR/launcher.sh"
+cp "$ROOT_DIR/scripts/dev-backend.sh" "$BUNDLED_SCRIPTS_DIR/dev-backend.sh"
+rsync -a --delete "$ROOT_DIR/runtime/backend/" "$BUNDLED_RUNTIME_DIR/backend/"
 
 if [[ -f "$ROOT_DIR/launcher/Resources/AppIcon.icns" ]]; then
   cp "$ROOT_DIR/launcher/Resources/AppIcon.icns" "$RESOURCES_DIR/AppIcon.icns"
@@ -69,6 +79,6 @@ else
   cp "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/ToolbarInfo.icns" "$RESOURCES_DIR/AppIcon.icns"
 fi
 
-chmod +x "$RESOURCES_DIR/launcher.sh"
+chmod +x "$BUNDLED_SCRIPTS_DIR/launcher.sh" "$BUNDLED_SCRIPTS_DIR/dev-backend.sh"
 
 echo "Launcher app built at: $APP_DIR"

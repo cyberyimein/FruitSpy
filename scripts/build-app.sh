@@ -22,5 +22,10 @@ mkdir -p "$RUNTIME_DIR/backend"
 rsync -a --delete "$BACKEND_DIR/app/" "$RUNTIME_DIR/backend/app/"
 rsync -a --delete "$BACKEND_DIR/frontend_dist/" "$RUNTIME_DIR/backend/frontend_dist/"
 cp "$BACKEND_DIR/requirements.txt" "$RUNTIME_DIR/backend/requirements.txt"
+cp "$BACKEND_DIR/env.temp.json" "$RUNTIME_DIR/backend/env.temp.json"
+
+if [[ -f "$BACKEND_DIR/env.json" ]]; then
+	cp "$BACKEND_DIR/env.json" "$RUNTIME_DIR/backend/env.json"
+fi
 
 echo "Build complete. Run scripts/dev-backend.sh to start local service."

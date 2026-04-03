@@ -106,13 +106,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     private func resolveLauncherScript() -> URL? {
-        let bundleURL = Bundle.main.bundleURL
-        let candidate = bundleURL
-            .appendingPathComponent("Contents")
-            .appendingPathComponent("Resources")
-            .appendingPathComponent("launcher.sh")
-        if FileManager.default.fileExists(atPath: candidate.path) {
-            return candidate
+        if let resourceURL = Bundle.main.resourceURL {
+            let bundledScript = resourceURL
+                .appendingPathComponent("scripts")
+                .appendingPathComponent("launcher.sh")
+            if FileManager.default.fileExists(atPath: bundledScript.path) {
+                return bundledScript
+            }
         }
 
         // Dev fallback so the launcher can run before packaging.
@@ -131,6 +131,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             if FileManager.default.fileExists(atPath: candidate.appendingPathComponent("scripts/launcher.sh").path) {
                 return candidate
             }
+        }
+
+        if let resourceURL = Bundle.main.resourceURL,
+           FileManager.default.fileExists(atPath: resourceURL.appendingPathComponent("scripts/launcher.sh").path) {
+            return resourceURL
         }
 
         let fromBundle = Bundle.main.bundleURL

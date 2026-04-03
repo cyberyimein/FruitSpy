@@ -1,17 +1,34 @@
 #!/usr/bin/env zsh
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
 if [[ -n "${FRUITSPY_ROOT:-}" ]]; then
   ROOT_DIR="$FRUITSPY_ROOT"
 else
-  ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+  ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 fi
-PID_FILE="$ROOT_DIR/runtime/fruitspy.pid"
-LOG_FILE="$ROOT_DIR/runtime/fruitspy.log"
+
+if [[ "$SCRIPT_DIR" == *.app/Contents/Resources/scripts ]]; then
+  DEFAULT_RUNTIME_DIR="$HOME/Library/Application Support/FruitSpy/runtime"
+else
+  DEFAULT_RUNTIME_DIR="$ROOT_DIR/runtime"
+fi
+
+RUNTIME_DIR="${FRUITSPY_RUNTIME_DIR:-$DEFAULT_RUNTIME_DIR}"
+
+BACKEND_START_SCRIPT="$SCRIPT_DIR/dev-backend.sh"
+if [[ ! -x "$BACKEND_START_SCRIPT" ]]; then
+  BACKEND_START_SCRIPT="$ROOT_DIR/scripts/dev-backend.sh"
+fi
+
+PID_FILE="$RUNTIME_DIR/fruitspy.pid"
+LOG_FILE="$RUNTIME_DIR/fruitspy.log"
 PORT="${FRUITSPY_PORT:-8848}"
 HEALTH_URL="http://localhost:$PORT/api/health"
 
-mkdir -p "$ROOT_DIR/runtime"
+mkdir -p "$RUNTIME_DIR"
+export FRUITSPY_RUNTIME_DIR="$RUNTIME_DIR"
 
 start_service() {
   if [[ -f "$PID_FILE" ]] && kill -0 "$(cat "$PID_FILE")" 2>/dev/null; then
@@ -19,7 +36,7 @@ start_service() {
     return 0
   fi
 
-  nohup "$ROOT_DIR/scripts/dev-backend.sh" > "$LOG_FILE" 2>&1 &
+  nohup "$BACKEND_START_SCRIPT" > "$LOG_FILE" 2>&1 &
   echo "$!" > "$PID_FILE"
 
   local attempts=0

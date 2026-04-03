@@ -54,7 +54,10 @@ cd scripts
 ./package-oneclick.sh
 ```
 
-This creates `dist/FruitSpy-oneclick.zip` containing `FruitSpy.app`.
+This creates `dist/FruitSpy-oneclick.zip` containing a self-contained `FruitSpy.app` bundle.
+
+On first launch, the packaged app creates its writable runtime state under `~/Library/Application Support/FruitSpy/runtime`.
+The launcher no longer depends on the repository checkout, but it still expects a local `python3` installation so it can create an isolated virtual environment.
 
 ## Launcher Controls
 
