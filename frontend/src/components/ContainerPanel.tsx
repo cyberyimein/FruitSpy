@@ -3,52 +3,96 @@ import type { ContainerMetrics } from '../lib/types';
 
 type Props = {
     containers: ContainerMetrics[];
-    dockerAvailable: boolean;
-    dockerError: string | null;
-    portainerUrl: string;
+    runtimeAvailable: boolean;
+    runtimeError: string | null;
+    runtimeName: string;
+    controlEnabled: boolean;
 };
 
 export default function ContainerPanel({
     containers,
-    dockerAvailable,
-    dockerError,
-    portainerUrl,
+    runtimeAvailable,
+    runtimeError,
+    runtimeName,
+    controlEnabled,
 }: Props) {
     const [active, setActive] = useState<string | null>(null);
     const [logs, setLogs] = useState<string[]>([]);
     const [logsTitle, setLogsTitle] = useState('');
     const [loadingLogs, setLoadingLogs] = useState(false);
     const [logsExpanded, setLogsExpanded] = useState(false);
+    const [actionInFlight, setActionInFlight] = useState<string | null>(null);
+    const [actionError, setActionError] = useState<string | null>(null);
+
+    const runningCount = containers.filter((container) => container.status === 'running').length;
 
     async function openLogs(container: ContainerMetrics) {
         setActive(container.id);
         setLogsTitle(container.name);
         setLogsExpanded(false);
         setLoadingLogs(true);
-        const response = await fetch(`/api/logs/${container.id}?tail=200`);
-        const payload = (await response.json()) as { lines?: string[]; error?: string };
-        setLoadingLogs(false);
-        setLogs(payload.lines ?? [payload.error ?? 'Failed to load logs']);
+        try {
+            const response = await fetch(`/api/logs/${encodeURIComponent(container.id)}?tail=200`);
+            const payload = (await response.json()) as { lines?: string[]; error?: string };
+            if (!response.ok) {
+                throw new Error(payload.error ?? `Failed to load logs for ${container.name}`);
+            }
+            setLogs(payload.lines ?? [payload.error ?? 'No logs returned']);
+        } catch (error) {
+            setLogs([
+                error instanceof Error
+                    ? error.message
+                    : `Failed to load logs for ${container.name}`,
+            ]);
+        } finally {
+            setLoadingLogs(false);
+        }
+    }
+
+    async function runAction(container: ContainerMetrics, action: 'start' | 'stop' | 'restart') {
+        const actionKey = `${container.id}:${action}`;
+        setActionInFlight(actionKey);
+        setActionError(null);
+        try {
+            const response = await fetch(`/api/containers/${encodeURIComponent(container.id)}/${action}`, {
+                method: 'POST',
+                headers: {
+                    'X-FruitSpy-Control': '1',
+                },
+            });
+            const payload = (await response.json()) as { detail?: string };
+            if (!response.ok) {
+                throw new Error(payload.detail ?? `Failed to ${action} ${container.name}`);
+            }
+        } catch (error) {
+            setActionError(error instanceof Error ? error.message : `Failed to ${action} ${container.name}`);
+        } finally {
+            setActionInFlight(null);
+        }
     }
 
     return (
         <section className="panel">
             <div className="panel-head panel-head-split">
                 <div>
-                    <h2>Running Containers</h2>
-                    <p>{containers.length} running</p>
+                    <h2>Containers</h2>
+                    <p>{runningCount} running / {containers.length} total / {runtimeName}</p>
                 </div>
-                <a className="secondary-btn" href={portainerUrl} target="_blank" rel="noreferrer">
-                    Open in Portainer
-                </a>
+                <span className={`status-badge ${runtimeAvailable ? '' : 'status-badge-danger'}`}>
+                    {runtimeAvailable ? 'Runtime ready' : 'Runtime unavailable'}
+                </span>
             </div>
 
-            {!dockerAvailable && (
-                <div className="panel-warning">Docker is unavailable on this host: {dockerError ?? 'unknown error'}</div>
+            {!runtimeAvailable && (
+                <div className="panel-warning">
+                    {runtimeName} is unavailable on this host: {runtimeError ?? 'unknown error'}
+                </div>
             )}
 
+            {actionError && <div className="panel-warning">{actionError}</div>}
+
             {containers.length === 0 ? (
-                <div className="empty-card">No running containers</div>
+                <div className="empty-card">No containers found</div>
             ) : (
                 <div className="container-list">
                     {containers.map((container) => (
@@ -62,13 +106,43 @@ export default function ContainerPanel({
                             </div>
                             <div className="mini-metric">
                                 <span>CPU</span>
-                                <strong>{container.cpu_percent.toFixed(1)}%</strong>
+                                <strong>{container.status === 'running' ? `${container.cpu_percent.toFixed(1)}%` : '--'}</strong>
                             </div>
                             <div className="mini-metric">
                                 <span>Memory</span>
-                                <strong>{container.memory_percent.toFixed(1)}%</strong>
+                                <strong>{container.status === 'running' ? `${container.memory_percent.toFixed(1)}%` : '--'}</strong>
                             </div>
                             <div className="row-actions">
+                                {controlEnabled && container.status === 'running' && (
+                                    <>
+                                        <button
+                                            className="text-btn"
+                                            type="button"
+                                            onClick={() => runAction(container, 'restart')}
+                                            disabled={actionInFlight !== null}
+                                        >
+                                            {actionInFlight === `${container.id}:restart` ? 'Restarting...' : 'Restart'}
+                                        </button>
+                                        <button
+                                            className="danger-btn"
+                                            type="button"
+                                            onClick={() => runAction(container, 'stop')}
+                                            disabled={actionInFlight !== null}
+                                        >
+                                            {actionInFlight === `${container.id}:stop` ? 'Stopping...' : 'Stop'}
+                                        </button>
+                                    </>
+                                )}
+                                {controlEnabled && container.status === 'stopped' && (
+                                    <button
+                                        className="secondary-btn"
+                                        type="button"
+                                        onClick={() => runAction(container, 'start')}
+                                        disabled={actionInFlight !== null}
+                                    >
+                                        {actionInFlight === `${container.id}:start` ? 'Starting...' : 'Start'}
+                                    </button>
+                                )}
                                 <button
                                     className="text-btn"
                                     type="button"

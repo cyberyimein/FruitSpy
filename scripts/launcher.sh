@@ -26,6 +26,9 @@ PID_FILE="$RUNTIME_DIR/fruitspy.pid"
 LOG_FILE="$RUNTIME_DIR/fruitspy.log"
 PORT="${FRUITSPY_PORT:-8848}"
 HEALTH_URL="http://localhost:$PORT/api/health"
+BACKEND_AGENT_LABEL="com.fruitspy.backend"
+BACKEND_AGENT_PATH="$HOME/Library/LaunchAgents/$BACKEND_AGENT_LABEL.plist"
+BACKEND_AGENT_DOMAIN="gui/$UID"
 
 mkdir -p "$RUNTIME_DIR"
 export FRUITSPY_RUNTIME_DIR="$RUNTIME_DIR"
@@ -71,6 +74,14 @@ mark_pid_stale() {
 
 health_is_ready() {
   curl -fsS "$HEALTH_URL" >/dev/null 2>&1
+}
+
+launchd_backend_is_installed() {
+  [[ -f "$BACKEND_AGENT_PATH" ]]
+}
+
+launchd_backend_is_loaded() {
+  launchctl print "$BACKEND_AGENT_DOMAIN/$BACKEND_AGENT_LABEL" >/dev/null 2>&1
 }
 
 wait_for_service() {
@@ -122,6 +133,25 @@ start_service() {
     return 0
   fi
 
+  if launchd_backend_is_installed; then
+    if ! launchd_backend_is_loaded; then
+      launchctl bootstrap "$BACKEND_AGENT_DOMAIN" "$BACKEND_AGENT_PATH"
+    fi
+    launchctl kickstart -k "$BACKEND_AGENT_DOMAIN/$BACKEND_AGENT_LABEL"
+
+    wait_for_service ""
+    case "$?" in
+      0)
+        echo "started"
+        ;;
+      3)
+        echo "timeout"
+        return 1
+        ;;
+    esac
+    return 0
+  fi
+
   nohup "$BACKEND_START_SCRIPT" > "$LOG_FILE" 2>&1 &
   local new_pid="$!"
   echo "$new_pid" > "$PID_FILE"
@@ -144,6 +174,13 @@ start_service() {
 }
 
 stop_service() {
+  if launchd_backend_is_loaded; then
+    launchctl bootout "$BACKEND_AGENT_DOMAIN/$BACKEND_AGENT_LABEL"
+    [[ -f "$PID_FILE" ]] && mark_pid_stale
+    echo "stopped"
+    return 0
+  fi
+
   local pid
   if pid="$(read_pid)"; then
     if pid_is_alive "$pid" && pid_matches_fruitspy_backend "$pid"; then

@@ -9,6 +9,12 @@ BUNDLED_SCRIPTS_DIR="$RESOURCES_DIR/scripts"
 BUNDLED_RUNTIME_DIR="$RESOURCES_DIR/runtime"
 FRONTEND_ICON_PNG="$ROOT_DIR/frontend/public/app-icon.png"
 FRONTEND_ICON_SVG="$ROOT_DIR/frontend/public/favicon.svg"
+BUILD_CACHE_DIR="$(mktemp -d)"
+
+cleanup() {
+  rm -rf "$BUILD_CACHE_DIR"
+}
+trap cleanup EXIT
 
 build_icns_from_png() {
   local png_path="$1"
@@ -90,12 +96,35 @@ fi
 rm -rf "$APP_DIR"
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR" "$BUNDLED_SCRIPTS_DIR" "$BUNDLED_RUNTIME_DIR"
 
-swiftc \
+SWIFT_SOURCES=(
+  "$ROOT_DIR/launcher/Sources/main.swift"
+  "$ROOT_DIR/launcher/Sources/AppDelegate.swift"
+  "$ROOT_DIR/launcher/Sources/ServiceController.swift"
+)
+SWIFT_CACHE_ENV=(
+  "CLANG_MODULE_CACHE_PATH=$BUILD_CACHE_DIR/clang"
+  "SWIFT_MODULECACHE_PATH=$BUILD_CACHE_DIR/swift"
+)
+SWIFT_LOG="$BUILD_CACHE_DIR/swiftc.log"
+
+if ! env "${SWIFT_CACHE_ENV[@]}" swiftc \
   -framework AppKit \
-  "$ROOT_DIR/launcher/Sources/main.swift" \
-  "$ROOT_DIR/launcher/Sources/AppDelegate.swift" \
-  "$ROOT_DIR/launcher/Sources/ServiceController.swift" \
-  -o "$MACOS_DIR/FruitSpyLauncher"
+  "${SWIFT_SOURCES[@]}" \
+  -o "$MACOS_DIR/FruitSpyLauncher" 2> "$SWIFT_LOG"; then
+  COMPATIBLE_SDK="/Library/Developer/CommandLineTools/SDKs/MacOSX15.4.sdk"
+  if [[ ! -d "$COMPATIBLE_SDK" ]]; then
+    cat "$SWIFT_LOG" >&2
+    exit 1
+  fi
+
+  echo "Default macOS SDK is incompatible with swiftc; retrying with MacOSX15.4.sdk"
+  env "${SWIFT_CACHE_ENV[@]}" swiftc \
+    -sdk "$COMPATIBLE_SDK" \
+    -target "$(uname -m)-apple-macosx12.0" \
+    -framework AppKit \
+    "${SWIFT_SOURCES[@]}" \
+    -o "$MACOS_DIR/FruitSpyLauncher"
+fi
 
 cp "$ROOT_DIR/launcher/Info.plist" "$APP_DIR/Contents/Info.plist"
 cp "$ROOT_DIR/scripts/launcher.sh" "$BUNDLED_SCRIPTS_DIR/launcher.sh"

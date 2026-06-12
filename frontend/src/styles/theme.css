@@ -55,6 +55,15 @@ body {
     font-size: 13px;
 }
 
+.runtime-pill {
+    border-radius: 999px;
+    border: 1px solid #cfe2dd;
+    padding: 6px 10px;
+    color: #255f53;
+    background: #e9f5f2;
+    font-size: 12px;
+}
+
 .connection-pill {
     display: inline-flex;
     align-items: center;
@@ -179,7 +188,7 @@ body {
 
 .container-row {
     display: grid;
-    grid-template-columns: minmax(240px, 1fr) 120px 120px 110px;
+    grid-template-columns: minmax(220px, 1fr) 100px 100px minmax(210px, auto);
     align-items: center;
     gap: 12px;
     border: 1px solid var(--line);
@@ -285,6 +294,7 @@ body {
 
 .primary-btn,
 .secondary-btn,
+.danger-btn,
 .text-btn {
     text-decoration: none;
     border: 1px solid transparent;
@@ -309,6 +319,27 @@ body {
 
 .text-btn {
     border-color: var(--line);
+}
+
+.danger-btn {
+    border-color: #efc2b6;
+    color: #8a4334;
+    background: #fdf0ec;
+}
+
+.primary-btn:disabled,
+.secondary-btn:disabled,
+.danger-btn:disabled,
+.text-btn:disabled {
+    cursor: wait;
+    opacity: 0.55;
+}
+
+.row-actions {
+    display: flex;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
 .package-overview-panel {
@@ -558,7 +589,7 @@ body {
     }
 
     .container-row {
-        grid-template-columns: 1fr 100px 100px auto;
+        grid-template-columns: 1fr 90px 90px minmax(180px, auto);
     }
 
     .package-overview-meta,

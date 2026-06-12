@@ -5,15 +5,13 @@ import os
 import time
 from pathlib import Path
 
-from fastapi import FastAPI, Query, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi import FastAPI, Header, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.config import load_runtime_config
 from app.models.schemas import PackageInventory, Snapshot
-from app.services.docker_logs import DockerLogsService
-from app.services.docker_metrics import DockerMetricsService
+from app.services.apple_container_runtime import AppleContainerRuntime
 from app.services.host_metrics import HostMetricsService
 from app.services.package_inventory import PackageInventoryService
 
@@ -40,29 +38,25 @@ FRONTEND_DIST = resolve_frontend_dist()
 RUNTIME_CONFIG = load_runtime_config()
 
 host_service = HostMetricsService(storage_path=RUNTIME_CONFIG.storage_path)
-docker_service = DockerMetricsService(base_url=RUNTIME_CONFIG.docker_base_url)
-logs_service = DockerLogsService(base_url=RUNTIME_CONFIG.docker_base_url)
+container_service = AppleContainerRuntime(
+    cli_path=RUNTIME_CONFIG.apple_container_cli,
+    auto_start=RUNTIME_CONFIG.container_auto_start,
+)
 package_inventory_service = PackageInventoryService()
 
 app = FastAPI(title="FruitSpy")
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 
 def collect_snapshot() -> Snapshot:
     host = host_service.collect()
-    containers, docker_available, docker_error = docker_service.collect_running()
+    containers, runtime_available, runtime_error = container_service.collect()
     return Snapshot(
         timestamp=time.time(),
         host=host,
         containers=containers,
-        docker_available=docker_available,
-        docker_error=docker_error,
+        runtime_name=container_service.display_name,
+        runtime_available=runtime_available,
+        runtime_error=runtime_error,
     )
 
 
@@ -75,6 +69,8 @@ def health() -> dict:
 def config() -> dict:
     return {
         "portainer_url": RUNTIME_CONFIG.portainer_url,
+        "runtime_name": container_service.display_name,
+        "container_control_enabled": RUNTIME_CONFIG.container_control_enabled,
         "refresh_seconds": RUNTIME_CONFIG.refresh_seconds,
         "logs_tail_default": RUNTIME_CONFIG.log_lines,
     }
@@ -90,7 +86,25 @@ def container_logs(
     container_id: str,
     tail: int = Query(default=RUNTIME_CONFIG.log_lines, ge=20, le=1000),
 ) -> dict:
-    return logs_service.tail(container_id=container_id, lines=tail)
+    return container_service.logs(container_id=container_id, lines=tail)
+
+
+@app.post("/api/containers/{container_id}/{action}")
+def control_container(
+    container_id: str,
+    action: str,
+    x_fruitspy_control: str = Header(default=""),
+) -> dict:
+    if not RUNTIME_CONFIG.container_control_enabled:
+        raise HTTPException(status_code=403, detail="Container controls are disabled")
+    if x_fruitspy_control != "1":
+        raise HTTPException(status_code=403, detail="Missing FruitSpy control header")
+    try:
+        return container_service.control(container_id=container_id, action=action)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
 @app.get("/api/packages")
@@ -103,9 +117,11 @@ async def ws_dashboard(ws: WebSocket) -> None:
     await ws.accept()
     try:
         while True:
-            payload = collect_snapshot().model_dump()
+            started_at = time.monotonic()
+            payload = (await asyncio.to_thread(collect_snapshot)).model_dump()
             await ws.send_json(payload)
-            await asyncio.sleep(RUNTIME_CONFIG.refresh_seconds)
+            elapsed = time.monotonic() - started_at
+            await asyncio.sleep(max(RUNTIME_CONFIG.refresh_seconds - elapsed, 0.1))
     except WebSocketDisconnect:
         return
 

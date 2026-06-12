@@ -1,14 +1,14 @@
 # FruitSpy
 
-FruitSpy is a lightweight macOS host and Docker runtime dashboard for LAN use.
+FruitSpy is a lightweight macOS host and Apple container dashboard for LAN use.
 
 ## What It Shows
 
-- Host CPU, memory, and storage usage (updates every second)
-- Running Docker containers with CPU and memory usage (updates every second)
+- Host CPU, memory, and storage usage (updates on the configured refresh interval)
+- Apple containers with status, CPU, and memory usage
 - Installed host packages from npm, Homebrew, pip, and uv with search
 - Per-container recent logs on demand
-- One-click jump to Portainer
+- Optional start, stop, and restart controls
 
 ## Architecture
 
@@ -17,6 +17,26 @@ FruitSpy is a lightweight macOS host and Docker runtime dashboard for LAN use.
 - Launcher: macOS menu bar app (`launcher`)
 
 The app is designed to run directly on the macOS host (not in Docker) so host metrics are accurate.
+
+## Runtime Requirements
+
+- Apple silicon Mac
+- macOS 26 or newer
+- [Apple container](https://github.com/apple/container) 1.0 or newer
+
+Install Apple container with Homebrew, then install its recommended Linux kernel and start it:
+
+```bash
+brew install container
+container system kernel set --recommended
+container system start
+container system version
+```
+
+FruitSpy can automatically start the Apple container system service when the CLI is installed.
+On first use, allow `container-runtime-linux` under System Settings > Privacy & Security >
+Local Network. Published ports can accept and then reset connections until the runtime is
+restarted after this permission is enabled.
 
 ## Quick Start (Dev)
 
@@ -45,7 +65,11 @@ Double-click `dist/FruitSpy.app` to one-click start service and open dashboard.
 cd scripts
 ./build-app.sh
 ./build-launcher.sh
+./install-login-agent.sh
 ```
+
+The login agents install FruitSpy under `~/Applications`, start the Apple container system,
+restore `kabumemo-backend`, and keep the FruitSpy backend running after login.
 
 ## One-click Release Package
 
@@ -71,7 +95,10 @@ The menu bar app provides:
 ## Environment Variables
 
 - `FRUITSPY_PORT` (default `8848`)
-- `FRUITSPY_PORTAINER_URL` (default `http://localhost:9000`)
+- `FRUITSPY_APPLE_CONTAINER_CLI` (optional explicit CLI path)
+- `FRUITSPY_CONTAINER_AUTO_START` (default `true`)
+- `FRUITSPY_CONTAINER_CONTROL_ENABLED` (default `false`)
+- `FRUITSPY_PORTAINER_URL` (optional; hidden when empty)
 - `FRUITSPY_STORAGE_PATH` (default `/`)
 - `FRUITSPY_LOG_LINES` (default `200`)
 
@@ -80,19 +107,32 @@ The menu bar app provides:
 - `backend/env.json`: local private config (gitignored)
 - `backend/env.temp.json`: safe template committed to repo
 
-Current local default in `backend/env.json` can point Portainer to your LAN host, for example:
-
-- `http://<your-host-ip>:9000`
-
 Optional keys in config JSON:
 
 - `portainer_url`
-- `docker_base_url` (for example `unix:///Users/<user>/.docker/run/docker.sock`)
+- `apple_container_cli`
+- `container_auto_start`
+- `container_control_enabled`
 - `storage_path`
 - `log_lines`
 - `refresh_seconds`
 
+Container controls are disabled in the committed template because FruitSpy currently has no
+authentication and listens on the LAN. Enable them only on a trusted network. Control requests
+are same-origin and require a FruitSpy-specific header to reduce cross-site request risk.
+
+## Moving Off Colima
+
+Apple container does not import Colima's Docker state. Recreate each workload with the Apple
+`container build`, `container create`, or `container run` commands, and copy persistent data
+before stopping Colima. Host bind mounts are the simplest migration path because the data
+remains directly accessible from macOS.
+
+FruitSpy itself no longer requires Docker Engine, the Docker socket, Docker Compose, or Portainer.
+See [docs/apple-container-migration.md](docs/apple-container-migration.md) for the migration
+commands for example workloads.
+
 ## Notes
 
-- Docker errors are isolated to the container panel; host metrics continue to work.
+- Apple container errors are isolated to the container panel; host metrics continue to work.
 - The app is intended for trusted LAN environments without login in this version.

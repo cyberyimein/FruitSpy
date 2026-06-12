@@ -18,13 +18,16 @@ const EMPTY_SNAPSHOT: Snapshot = {
         storage_total_gb: 0,
     },
     containers: [],
-    docker_available: true,
-    docker_error: null,
+    runtime_name: 'Apple container',
+    runtime_available: true,
+    runtime_error: null,
 };
 
 const DEFAULT_CONFIG: RuntimeConfig = {
-    portainer_url: 'http://localhost:9000',
-    refresh_seconds: 1,
+    portainer_url: '',
+    runtime_name: 'Apple container',
+    container_control_enabled: false,
+    refresh_seconds: 3,
     logs_tail_default: 200,
 };
 
@@ -57,11 +60,14 @@ export default function App() {
                     <p>macOS host and container watch</p>
                 </div>
                 <div className="topbar-right">
+                    <span className="runtime-pill">{config.runtime_name}</span>
                     <ConnectionIndicator state={connection} />
                     <span className="updated-at">Updated {updatedAt}</span>
-                    <a className="primary-btn" href={config.portainer_url} target="_blank" rel="noreferrer">
-                        Portainer
-                    </a>
+                    {config.portainer_url && (
+                        <a className="primary-btn" href={config.portainer_url} target="_blank" rel="noreferrer">
+                            Portainer
+                        </a>
+                    )}
                 </div>
             </header>
 
@@ -70,9 +76,10 @@ export default function App() {
                 <PackageInventoryPanel host={snapshot.host} updatedAt={updatedAt} />
                 <ContainerPanel
                     containers={snapshot.containers}
-                    dockerAvailable={snapshot.docker_available}
-                    dockerError={snapshot.docker_error}
-                    portainerUrl={config.portainer_url}
+                    runtimeAvailable={snapshot.runtime_available}
+                    runtimeError={snapshot.runtime_error}
+                    runtimeName={snapshot.runtime_name}
+                    controlEnabled={config.container_control_enabled}
                 />
             </main>
         </div>

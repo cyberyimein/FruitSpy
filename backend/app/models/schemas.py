@@ -30,8 +30,9 @@ class Snapshot(BaseModel):
     timestamp: float
     host: HostMetrics
     containers: list[ContainerMetrics] = Field(default_factory=list)
-    docker_available: bool = True
-    docker_error: Optional[str] = None
+    runtime_name: str
+    runtime_available: bool = True
+    runtime_error: Optional[str] = None
 
 
 class PackageRecord(BaseModel):

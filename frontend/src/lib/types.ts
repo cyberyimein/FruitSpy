@@ -23,12 +23,15 @@ export type Snapshot = {
     timestamp: number;
     host: HostMetrics;
     containers: ContainerMetrics[];
-    docker_available: boolean;
-    docker_error: string | null;
+    runtime_name: string;
+    runtime_available: boolean;
+    runtime_error: string | null;
 };
 
 export type RuntimeConfig = {
     portainer_url: string;
+    runtime_name: string;
+    container_control_enabled: boolean;
     refresh_seconds: number;
     logs_tail_default: number;
 };
