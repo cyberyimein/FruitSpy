@@ -5,7 +5,7 @@ FruitSpy is a lightweight macOS host and Apple container dashboard for LAN use.
 ## What It Shows
 
 - Host CPU, memory, and storage usage (updates on the configured refresh interval)
-- Apple containers with status, CPU, and memory usage
+- Apple containers with status, live CPU usage, actual memory usage, and configured limits
 - Installed host packages from npm, Homebrew, pip, and uv with search
 - Per-container recent logs on demand
 - Optional start, stop, and restart controls

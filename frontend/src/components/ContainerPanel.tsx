@@ -9,6 +9,34 @@ type Props = {
     controlEnabled: boolean;
 };
 
+function formatCpuLimit(cpus: number) {
+    if (!Number.isFinite(cpus) || cpus <= 0) {
+        return 'Limit unknown';
+    }
+    const value = Number.isInteger(cpus) ? cpus.toFixed(0) : cpus.toFixed(1);
+    return `${value} ${cpus === 1 ? 'core' : 'cores'} max`;
+}
+
+function formatMemoryLimit(memoryMb: number) {
+    if (!Number.isFinite(memoryMb) || memoryMb <= 0) {
+        return 'Limit unknown';
+    }
+    if (memoryMb >= 1024) {
+        return `${(memoryMb / 1024).toFixed(memoryMb % 1024 === 0 ? 0 : 1)} GiB max`;
+    }
+    return `${memoryMb.toFixed(0)} MiB max`;
+}
+
+function formatMemoryUsage(memoryMb: number) {
+    if (!Number.isFinite(memoryMb) || memoryMb < 0) {
+        return 'Unknown';
+    }
+    if (memoryMb >= 1024) {
+        return `${(memoryMb / 1024).toFixed(2)} GiB`;
+    }
+    return `${memoryMb.toFixed(1)} MiB`;
+}
+
 export default function ContainerPanel({
     containers,
     runtimeAvailable,
@@ -105,12 +133,25 @@ export default function ContainerPanel({
                                 <p className="row-sub">{container.image}</p>
                             </div>
                             <div className="mini-metric">
-                                <span>CPU</span>
-                                <strong>{container.status === 'running' ? `${container.cpu_percent.toFixed(1)}%` : '--'}</strong>
+                                <span>CPU used</span>
+                                <strong>
+                                    {container.status === 'running' ? `${container.cpu_percent.toFixed(1)}%` : '--'}
+                                </strong>
+                                <small>{formatCpuLimit(container.cpu_limit)}</small>
                             </div>
                             <div className="mini-metric">
-                                <span>Memory</span>
-                                <strong>{container.status === 'running' ? `${container.memory_percent.toFixed(1)}%` : '--'}</strong>
+                                <span>
+                                    Memory
+                                    {container.status === 'running'
+                                        ? ` · ${container.memory_percent.toFixed(1)}%`
+                                        : ''}
+                                </span>
+                                <strong>
+                                    {container.status === 'running'
+                                        ? formatMemoryUsage(container.memory_used_mb)
+                                        : '--'}
+                                </strong>
+                                <small>{formatMemoryLimit(container.memory_limit_mb)}</small>
                             </div>
                             <div className="row-actions">
                                 {controlEnabled && container.status === 'running' && (

@@ -31,7 +31,7 @@ def container_list_payload() -> str:
                 "configuration": {
                     "id": "web",
                     "image": {"reference": "docker.io/library/nginx:latest"},
-                    "resources": {"memoryInBytes": 1_073_741_824},
+                    "resources": {"cpus": 2, "memoryInBytes": 1_073_741_824},
                 },
                 "status": {"state": "running"},
             },
@@ -40,7 +40,7 @@ def container_list_payload() -> str:
                 "configuration": {
                     "id": "worker",
                     "image": {"reference": "example/worker:latest"},
-                    "resources": {"memoryInBytes": 536_870_912},
+                    "resources": {"cpus": 1, "memoryInBytes": 536_870_912},
                 },
                 "status": {"state": "stopped"},
             },
@@ -98,8 +98,12 @@ class AppleContainerRuntimeTests(unittest.TestCase):
         self.assertEqual([container.id for container in first], ["web", "worker"])
         self.assertEqual(first[0].cpu_percent, 0.0)
         self.assertEqual(second[0].cpu_percent, 50.0)
+        self.assertEqual(second[0].cpu_limit, 2.0)
         self.assertEqual(second[0].memory_percent, 25.0)
+        self.assertEqual(second[0].memory_used_mb, 256.0)
+        self.assertEqual(second[0].memory_limit_mb, 1024.0)
         self.assertEqual(second[1].status, "stopped")
+        self.assertEqual(second[1].cpu_limit, 1.0)
         self.assertEqual(second[1].memory_limit_mb, 512.0)
 
     def test_starts_system_service_and_retries_list(self) -> None:

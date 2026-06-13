@@ -203,6 +203,7 @@ class AppleContainerRuntime:
                     resources = configuration.get("resources", {})
                     if not isinstance(resources, dict):
                         resources = {}
+                    cpu_limit = self._number(resources, "cpus", "cpu_count")
 
                     stats = stats_by_id.get(container_id, {})
                     memory_used = self._number(stats, "memoryUsageBytes", "memory_usage_bytes")
@@ -225,6 +226,7 @@ class AppleContainerRuntime:
                             image=image,
                             status=status,
                             cpu_percent=cpu_percent,
+                            cpu_limit=cpu_limit,
                             memory_percent=round(memory_percent, 1),
                             memory_used_mb=round(memory_used / (1024**2), 1),
                             memory_limit_mb=round(memory_limit / (1024**2), 1),

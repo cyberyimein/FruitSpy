@@ -14,6 +14,7 @@ export type ContainerMetrics = {
     image: string;
     status: string;
     cpu_percent: number;
+    cpu_limit: number;
     memory_percent: number;
     memory_used_mb: number;
     memory_limit_mb: number;

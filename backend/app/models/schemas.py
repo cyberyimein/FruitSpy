@@ -21,6 +21,7 @@ class ContainerMetrics(BaseModel):
     image: str
     status: str
     cpu_percent: float = 0.0
+    cpu_limit: float = 0.0
     memory_percent: float = 0.0
     memory_used_mb: float = 0.0
     memory_limit_mb: float = 0.0
