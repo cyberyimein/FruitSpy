@@ -24,7 +24,6 @@ const EMPTY_SNAPSHOT: Snapshot = {
 };
 
 const DEFAULT_CONFIG: RuntimeConfig = {
-    portainer_url: '',
     runtime_name: 'Apple container',
     container_control_enabled: false,
     refresh_seconds: 3,
@@ -63,11 +62,6 @@ export default function App() {
                     <span className="runtime-pill">{config.runtime_name}</span>
                     <ConnectionIndicator state={connection} />
                     <span className="updated-at">Updated {updatedAt}</span>
-                    {config.portainer_url && (
-                        <a className="primary-btn" href={config.portainer_url} target="_blank" rel="noreferrer">
-                            Portainer
-                        </a>
-                    )}
                 </div>
             </header>
 

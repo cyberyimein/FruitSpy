@@ -30,7 +30,6 @@ export type Snapshot = {
 };
 
 export type RuntimeConfig = {
-    portainer_url: string;
     runtime_name: string;
     container_control_enabled: boolean;
     refresh_seconds: number;

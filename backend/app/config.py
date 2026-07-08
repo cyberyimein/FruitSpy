@@ -9,7 +9,6 @@ from typing import Any, Dict
 
 @dataclass
 class RuntimeConfig:
-    portainer_url: str
     apple_container_cli: str
     container_auto_start: bool
     container_control_enabled: bool
@@ -49,7 +48,6 @@ def load_runtime_config() -> RuntimeConfig:
     if not config_data:
         config_data = _load_json(BACKEND_ROOT / "env.temp.json")
 
-    portainer_url = os.getenv("FRUITSPY_PORTAINER_URL", str(config_data.get("portainer_url", "")))
     apple_container_cli = os.getenv(
         "FRUITSPY_APPLE_CONTAINER_CLI",
         str(config_data.get("apple_container_cli", "")),
@@ -78,7 +76,6 @@ def load_runtime_config() -> RuntimeConfig:
         refresh_seconds = 1
 
     return RuntimeConfig(
-        portainer_url=portainer_url,
         apple_container_cli=apple_container_cli,
         container_auto_start=container_auto_start,
         container_control_enabled=container_control_enabled,

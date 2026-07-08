@@ -68,7 +68,6 @@ def health() -> dict:
 @app.get("/api/config")
 def config() -> dict:
     return {
-        "portainer_url": RUNTIME_CONFIG.portainer_url,
         "runtime_name": container_service.display_name,
         "container_control_enabled": RUNTIME_CONFIG.container_control_enabled,
         "refresh_seconds": RUNTIME_CONFIG.refresh_seconds,
