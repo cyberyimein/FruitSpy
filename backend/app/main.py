@@ -40,6 +40,8 @@ RUNTIME_CONFIG = load_runtime_config()
 host_service = HostMetricsService(storage_path=RUNTIME_CONFIG.storage_path)
 container_service = AppleContainerRuntime(
     cli_path=RUNTIME_CONFIG.apple_container_cli,
+    app_root=RUNTIME_CONFIG.apple_container_app_root,
+    launchd_plist=RUNTIME_CONFIG.apple_container_launchd_plist,
     auto_start=RUNTIME_CONFIG.container_auto_start,
 )
 package_inventory_service = PackageInventoryService()

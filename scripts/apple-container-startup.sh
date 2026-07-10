@@ -15,7 +15,28 @@ if [[ -z "$CONTAINER_BIN" || ! -x "$CONTAINER_BIN" ]]; then
   exit 0
 fi
 
-"$CONTAINER_BIN" system start >/dev/null 2>&1 || true
+CONTAINER_APP_ROOT="${FRUITSPY_APPLE_CONTAINER_APP_ROOT:-}"
+if [[ -n "$CONTAINER_APP_ROOT" ]]; then
+  export CONTAINER_APP_ROOT
+fi
+
+if [[ -n "$CONTAINER_APP_ROOT" ]]; then
+  # launchd cannot reliably bootstrap a plist stored directly on /Volumes.
+  # Keep the API plist on the system volume while its data root remains on the SSD.
+  LAUNCHD_PLIST="${FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST:-$HOME/Library/Application Support/FruitSpy/container-apiserver.plist}"
+  mkdir -p "$(dirname "$LAUNCHD_PLIST")"
+  if [[ -f "$CONTAINER_APP_ROOT/apiserver/apiserver.plist" ]]; then
+    install -m 644 "$CONTAINER_APP_ROOT/apiserver/apiserver.plist" "$LAUNCHD_PLIST"
+  fi
+
+  SERVICE_DOMAIN="gui/$UID"
+  if ! launchctl print "$SERVICE_DOMAIN/com.apple.container.apiserver" >/dev/null 2>&1; then
+    launchctl bootstrap "$SERVICE_DOMAIN" "$LAUNCHD_PLIST" >/dev/null 2>&1 || true
+  fi
+else
+  start_args=(system start)
+  "$CONTAINER_BIN" "${start_args[@]}" >/dev/null 2>&1 || true
+fi
 
 ready=false
 for _ in {1..30}; do

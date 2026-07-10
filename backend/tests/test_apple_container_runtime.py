@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
+import tempfile
 import unittest
+from pathlib import Path
 
 from app.services.apple_container_runtime import AppleContainerRuntime
 
@@ -126,6 +129,37 @@ class AppleContainerRuntimeTests(unittest.TestCase):
         self.assertTrue(available)
         self.assertIsNone(error)
         self.assertEqual(runner.calls[1][1:], ["system", "start"])
+
+    def test_starts_system_service_with_custom_app_root(self) -> None:
+        runner = SequenceRunner(
+            [
+                completed(stderr="service unavailable", returncode=1),
+                completed(),
+                completed(stderr="service starting", returncode=1),
+                completed(),
+                completed("[]"),
+            ]
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            launchd_plist = Path(temp_dir) / "container-apiserver.plist"
+            launchd_plist.touch()
+            runtime = AppleContainerRuntime(
+                cli_path="/usr/bin/true",
+                app_root="/Volumes/DOCK/container-data",
+                launchd_plist=str(launchd_plist),
+                auto_start=True,
+                runner=runner,
+                sleeper=lambda _: None,
+            )
+
+            runtime.collect()
+
+        self.assertEqual(
+            runner.calls[1][1:],
+            ["bootstrap", f"gui/{os.getuid()}", str(launchd_plist)],
+        )
+        self.assertEqual(runner.calls[2][1:], ["system", "status"])
+        self.assertEqual(runner.calls[3][1:], ["system", "status"])
 
     def test_hides_internal_builder_containers(self) -> None:
         payload = json.loads(container_list_payload())

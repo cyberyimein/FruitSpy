@@ -2,6 +2,35 @@
 
 This guide moves workloads from Colima to Apple container.
 
+## Move Apple Container Data To An External SSD
+
+Apple container 1.0.0 supports a custom application-data root. The application binaries remain
+on the system volume, while images, snapshots, containers, and volumes can live on an external
+APFS volume. For this Mac, FruitSpy uses `/Volumes/DOCK/container-data`.
+
+Stop the service, copy the complete app root, and keep the original directory until verification
+is complete:
+
+```bash
+APP_ROOT="/Volumes/DOCK/container-data"
+OLD_ROOT="$HOME/Library/Application Support/com.apple.container"
+FRUITSPY_ROOT="/path/to/FruitSpy"
+
+container system stop
+mkdir -p "$APP_ROOT"
+cp -Rp "$OLD_ROOT/." "$APP_ROOT/"
+
+FRUITSPY_APPLE_CONTAINER_APP_ROOT="$APP_ROOT" \
+FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST="$HOME/Library/Application Support/FruitSpy/container-apiserver.plist" \
+  "$FRUITSPY_ROOT/scripts/apple-container-startup.sh"
+```
+
+The FruitSpy login agent and backend must also receive `FRUITSPY_APPLE_CONTAINER_APP_ROOT`; an
+unqualified `container system start` would otherwise use the old system-volume root after login.
+The external volume must be mounted before the agents start. FruitSpy keeps the API launchd plist
+on the system volume because macOS launchd cannot reliably bootstrap a plist stored directly under
+`/Volumes`, while the API's `CONTAINER_APP_ROOT` still points to the SSD.
+
 ## Current Resource Model
 
 Recorded on June 13, 2026 for Apple container 1.0.0:
@@ -125,5 +154,5 @@ included login agent to restore the Apple container system, KabuMemo, and FruitS
 cd /path/to/FruitSpy/scripts
 ./build-app.sh
 ./build-launcher.sh
-./install-login-agent.sh
+FRUITSPY_APPLE_CONTAINER_APP_ROOT="/Volumes/DOCK/container-data" ./install-login-agent.sh
 ```

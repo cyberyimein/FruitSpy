@@ -1,18 +1,21 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
 import threading
 import time
 from collections.abc import Callable
+from pathlib import Path
 from typing import Any, Optional
 
 from app.models.schemas import ContainerMetrics
 
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
 Clock = Callable[[], float]
+Sleeper = Callable[[float], None]
 
 
 class AppleContainerRuntime:
@@ -23,14 +26,24 @@ class AppleContainerRuntime:
     def __init__(
         self,
         cli_path: str = "",
+        app_root: str = "",
+        launchd_plist: str = "",
         auto_start: bool = True,
         runner: CommandRunner = subprocess.run,
         clock: Clock = time.monotonic,
+        sleeper: Sleeper = time.sleep,
     ) -> None:
         self._configured_cli_path = cli_path
+        self._app_root = app_root.strip()
+        self._launchd_plist = (
+            Path(launchd_plist).expanduser()
+            if launchd_plist.strip()
+            else Path.home() / "Library/Application Support/FruitSpy/container-apiserver.plist"
+        )
         self._auto_start = auto_start
         self._runner = runner
         self._clock = clock
+        self._sleeper = sleeper
         self._lock = threading.RLock()
         self._cpu_samples: dict[str, tuple[float, float]] = {}
 
@@ -126,9 +139,42 @@ class AppleContainerRuntime:
         return cls._container_id_pattern.fullmatch(container_id) is not None
 
     def _ensure_system_started(self) -> None:
-        result = self._run("system", "start", timeout=60)
+        if self._app_root:
+            if self._launchd_plist.is_file():
+                try:
+                    result = self._runner(
+                        ["launchctl", "bootstrap", f"gui/{os.getuid()}", str(self._launchd_plist)],
+                        capture_output=True,
+                        text=True,
+                        check=False,
+                        timeout=30,
+                    )
+                except (OSError, subprocess.TimeoutExpired) as exc:
+                    raise RuntimeError(f"Unable to start Apple container services: {exc}") from exc
+                if result.returncode not in (0, 37):
+                    raise RuntimeError(f"Unable to start Apple container services: {self._command_error(result)}")
+                self._wait_for_system_ready()
+                return
+
+        args = ["system", "start"]
+        if self._app_root:
+            args.extend(("--app-root", self._app_root))
+        result = self._run(*args, timeout=60)
         if result.returncode != 0:
             raise RuntimeError(f"Unable to start Apple container services: {self._command_error(result)}")
+
+    def _wait_for_system_ready(self) -> None:
+        deadline = self._clock() + 30.0
+        last_error = "unknown Apple container error"
+        while True:
+            result = self._run("system", "status", timeout=10)
+            if result.returncode == 0:
+                return
+
+            last_error = self._command_error(result)
+            if self._clock() >= deadline:
+                raise RuntimeError(f"Apple container services did not become ready: {last_error}")
+            self._sleeper(1.0)
 
     def _list_containers(self) -> list[dict[str, Any]]:
         result = self._run("list", "--all", "--format", "json")

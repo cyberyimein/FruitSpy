@@ -10,6 +10,8 @@ from typing import Any, Dict
 @dataclass
 class RuntimeConfig:
     apple_container_cli: str
+    apple_container_app_root: str
+    apple_container_launchd_plist: str
     container_auto_start: bool
     container_control_enabled: bool
     storage_path: str
@@ -52,6 +54,14 @@ def load_runtime_config() -> RuntimeConfig:
         "FRUITSPY_APPLE_CONTAINER_CLI",
         str(config_data.get("apple_container_cli", "")),
     )
+    apple_container_app_root = os.getenv(
+        "FRUITSPY_APPLE_CONTAINER_APP_ROOT",
+        str(config_data.get("apple_container_app_root", "")),
+    )
+    apple_container_launchd_plist = os.getenv(
+        "FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST",
+        str(config_data.get("apple_container_launchd_plist", "")),
+    )
     container_auto_start = _bool_value(
         os.getenv("FRUITSPY_CONTAINER_AUTO_START", config_data.get("container_auto_start", True)),
         True,
@@ -77,6 +87,8 @@ def load_runtime_config() -> RuntimeConfig:
 
     return RuntimeConfig(
         apple_container_cli=apple_container_cli,
+        apple_container_app_root=apple_container_app_root,
+        apple_container_launchd_plist=apple_container_launchd_plist,
         container_auto_start=container_auto_start,
         container_control_enabled=container_control_enabled,
         storage_path=storage_path,

@@ -16,6 +16,20 @@ BACKEND_AGENT_PATH="$HOME/Library/LaunchAgents/com.fruitspy.backend.plist"
 BACKEND_AGENT_LABEL="com.fruitspy.backend"
 DOMAIN="gui/$UID"
 
+configure_agent_environment() {
+  local agent_path="$1"
+  local key="$2"
+  local value="$3"
+  local key_path="EnvironmentVariables.$key"
+
+  if [[ -n "$value" ]]; then
+    /usr/bin/plutil -replace "$key_path" -string "$value" "$agent_path" >/dev/null 2>&1 \
+      || /usr/bin/plutil -insert "$key_path" -string "$value" "$agent_path"
+  else
+    /usr/bin/plutil -remove "$key_path" "$agent_path" >/dev/null 2>&1 || true
+  fi
+}
+
 unload_agent() {
   local label="$1"
   local path="$2"
@@ -66,6 +80,11 @@ mkdir -p "$HOME/Applications" "$BIN_DIR" "$HOME/Library/LaunchAgents"
 
 reload_workload=false
 reload_backend=false
+if [[ -n "${FRUITSPY_APPLE_CONTAINER_APP_ROOT:-}" \
+  || -n "${FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST:-}" ]]; then
+  reload_workload=true
+  reload_backend=true
+fi
 if [[ ! -f "$WORKLOAD_AGENT_PATH" ]] \
   || ! /usr/bin/cmp -s "$SOURCE_WORKLOAD_PLIST" "$WORKLOAD_AGENT_PATH" \
   || ! launchctl print "$DOMAIN/$WORKLOAD_AGENT_LABEL" >/dev/null 2>&1; then
@@ -83,6 +102,18 @@ rsync -a --delete "$SOURCE_APP/" "$APP_DIR/"
 install -m 755 "$SOURCE_STARTUP" "$STARTUP_SCRIPT"
 install -m 644 "$SOURCE_WORKLOAD_PLIST" "$WORKLOAD_AGENT_PATH"
 install -m 644 "$SOURCE_BACKEND_PLIST" "$BACKEND_AGENT_PATH"
+configure_agent_environment "$WORKLOAD_AGENT_PATH" \
+  "FRUITSPY_APPLE_CONTAINER_APP_ROOT" \
+  "${FRUITSPY_APPLE_CONTAINER_APP_ROOT:-}"
+configure_agent_environment "$WORKLOAD_AGENT_PATH" \
+  "FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST" \
+  "${FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST:-}"
+configure_agent_environment "$BACKEND_AGENT_PATH" \
+  "FRUITSPY_APPLE_CONTAINER_APP_ROOT" \
+  "${FRUITSPY_APPLE_CONTAINER_APP_ROOT:-}"
+configure_agent_environment "$BACKEND_AGENT_PATH" \
+  "FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST" \
+  "${FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST:-}"
 
 if [[ "$reload_workload" == true ]]; then
   load_agent "$WORKLOAD_AGENT_LABEL" "$WORKLOAD_AGENT_PATH"

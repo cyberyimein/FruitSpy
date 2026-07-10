@@ -9,7 +9,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var projectRootURL: URL!
     private var startMenuItem: NSMenuItem!
     private var stopMenuItem: NSMenuItem!
-    private var hasShownHelp = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         guard let scriptURL = resolveLauncherScript() else {
@@ -28,11 +27,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         serviceController = ServiceController(scriptURL: scriptURL, projectRootURL: rootURL)
 
-        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        statusItem.button?.title = "FruitSpy"
-        statusItem.button?.toolTip = "FruitSpy"
+        statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        configureStatusButton()
 
         statusMenu = NSMenu()
+
+        let appNameItem = NSMenuItem(title: "FruitSpy", action: nil, keyEquivalent: "")
+        appNameItem.isEnabled = false
+        statusMenu.addItem(appNameItem)
 
         statusLabelItem = NSMenuItem(title: "Status: --", action: nil, keyEquivalent: "")
         statusLabelItem.isEnabled = false
@@ -61,7 +63,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         serviceController.openPanel()
         refreshStatusLabel()
-        showUsageHelpIfNeeded()
     }
 
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
@@ -103,6 +104,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let isRunning = status == "running"
         startMenuItem.isEnabled = !isRunning
         stopMenuItem.isEnabled = isRunning
+    }
+
+    private func configureStatusButton() {
+        guard let button = statusItem.button else {
+            return
+        }
+
+        if let image = NSImage(systemSymbolName: "eye", accessibilityDescription: "FruitSpy") {
+            image.isTemplate = true
+            button.image = image
+            button.imagePosition = .imageOnly
+            button.title = ""
+        } else {
+            button.title = "F"
+        }
+
+        button.toolTip = "FruitSpy"
     }
 
     private func resolveLauncherScript() -> URL? {
@@ -157,20 +175,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         alert.messageText = "FruitSpy Launcher"
         alert.informativeText = message
         alert.alertStyle = .critical
-        alert.runModal()
-    }
-
-    private func showUsageHelpIfNeeded() {
-        if hasShownHelp {
-            return
-        }
-        hasShownHelp = true
-
-        let alert = NSAlert()
-        alert.messageText = "FruitSpy is running"
-        alert.informativeText = "Use menu bar item 'FruitSpy' to control service.\nChoose 'Stop Service and Quit' to fully close."
-        alert.alertStyle = .informational
-        alert.addButton(withTitle: "Got it")
         alert.runModal()
     }
 }

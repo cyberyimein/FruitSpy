@@ -96,6 +96,8 @@ The menu bar app provides:
 
 - `FRUITSPY_PORT` (default `8848`)
 - `FRUITSPY_APPLE_CONTAINER_CLI` (optional explicit CLI path)
+- `FRUITSPY_APPLE_CONTAINER_APP_ROOT` (optional Apple container application-data root)
+- `FRUITSPY_APPLE_CONTAINER_LAUNCHD_PLIST` (optional system-volume API launchd plist path)
 - `FRUITSPY_CONTAINER_AUTO_START` (default `true`)
 - `FRUITSPY_CONTAINER_CONTROL_ENABLED` (default `false`)
 - `FRUITSPY_STORAGE_PATH` (default `/`)
@@ -109,6 +111,8 @@ The menu bar app provides:
 Optional keys in config JSON:
 
 - `apple_container_cli`
+- `apple_container_app_root`
+- `apple_container_launchd_plist`
 - `container_auto_start`
 - `container_control_enabled`
 - `storage_path`
