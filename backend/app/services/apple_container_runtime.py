@@ -132,6 +132,7 @@ class AppleContainerRuntime:
         return (
             "com.apple.container.plugin" in labels
             or labels.get("com.apple.container.resource.role") == "builder"
+            or labels.get("com.fruitspy.internal") in {True, "true", "1"}
         )
 
     @classmethod

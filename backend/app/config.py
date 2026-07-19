@@ -17,6 +17,22 @@ class RuntimeConfig:
     storage_path: str
     log_lines: int
     refresh_seconds: int
+    python_tool_enabled: bool
+    python_tool_token: str
+    python_tool_allowed_cidrs: tuple[str, ...]
+    python_sandbox_image: str
+    python_sandbox_network: str
+    python_sandbox_timeout_seconds: int
+    python_sandbox_max_output_chars: int
+    python_sandbox_max_code_bytes: int
+    python_sandbox_cpu_count: float
+    python_sandbox_memory_mb: int
+    python_sandbox_max_concurrency: int
+    python_sandbox_max_artifacts: int
+    python_sandbox_max_artifact_bytes: int
+    python_sandbox_max_artifact_total_bytes: int
+    python_sandbox_artifact_ttl_seconds: int
+    python_tool_state_path: str
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -85,6 +101,61 @@ def load_runtime_config() -> RuntimeConfig:
     except ValueError:
         refresh_seconds = 1
 
+    python_tool_enabled = _bool_value(
+        os.getenv("FRUITSPY_PYTHON_TOOL_ENABLED", config_data.get("python_tool_enabled", False)),
+        False,
+    )
+    python_tool_token = os.getenv(
+        "FRUITSPY_PYTHON_TOOL_TOKEN",
+        str(config_data.get("python_tool_token", "")),
+    ).strip()
+    allowed_cidr_value = os.getenv(
+        "FRUITSPY_PYTHON_TOOL_ALLOWED_CIDRS",
+        config_data.get("python_tool_allowed_cidrs", ["192.168.64.0/24"]),
+    )
+    if isinstance(allowed_cidr_value, str):
+        python_tool_allowed_cidrs = tuple(
+            item.strip() for item in allowed_cidr_value.split(",") if item.strip()
+        )
+    elif isinstance(allowed_cidr_value, (list, tuple)):
+        python_tool_allowed_cidrs = tuple(
+            str(item).strip() for item in allowed_cidr_value if str(item).strip()
+        )
+    else:
+        python_tool_allowed_cidrs = ("192.168.64.0/24",)
+    if not python_tool_allowed_cidrs:
+        python_tool_allowed_cidrs = ("192.168.64.0/24",)
+    python_sandbox_image = os.getenv(
+        "FRUITSPY_PYTHON_SANDBOX_IMAGE",
+        str(config_data.get("python_sandbox_image", "anomalo-python:latest")),
+    ).strip()
+    python_sandbox_network = os.getenv(
+        "FRUITSPY_PYTHON_SANDBOX_NETWORK",
+        str(config_data.get("python_sandbox_network", "fruitspy-python-internal")),
+    ).strip()
+
+    def int_setting(env_name: str, config_name: str, default: int) -> int:
+        try:
+            return int(os.getenv(env_name, str(config_data.get(config_name, default))))
+        except (TypeError, ValueError):
+            return default
+
+    try:
+        python_sandbox_cpu_count = float(
+            os.getenv(
+                "FRUITSPY_PYTHON_SANDBOX_CPU_COUNT",
+                str(config_data.get("python_sandbox_cpu_count", 1)),
+            )
+        )
+    except (TypeError, ValueError):
+        python_sandbox_cpu_count = 1.0
+
+    runtime_dir = Path(os.getenv("FRUITSPY_RUNTIME_DIR", str(PROJECT_ROOT / "runtime")))
+    python_tool_state_path = os.getenv(
+        "FRUITSPY_PYTHON_TOOL_STATE_PATH",
+        str(config_data.get("python_tool_state_path", runtime_dir / "state.json")),
+    )
+
     return RuntimeConfig(
         apple_container_cli=apple_container_cli,
         apple_container_app_root=apple_container_app_root,
@@ -94,4 +165,59 @@ def load_runtime_config() -> RuntimeConfig:
         storage_path=storage_path,
         log_lines=log_lines,
         refresh_seconds=max(refresh_seconds, 1),
+        python_tool_enabled=python_tool_enabled,
+        python_tool_token=python_tool_token,
+        python_tool_allowed_cidrs=python_tool_allowed_cidrs,
+        python_sandbox_image=python_sandbox_image or "anomalo-python:latest",
+        python_sandbox_network=python_sandbox_network or "fruitspy-python-internal",
+        python_sandbox_timeout_seconds=max(
+            int_setting("FRUITSPY_PYTHON_SANDBOX_TIMEOUT_SECONDS", "python_sandbox_timeout_seconds", 10),
+            1,
+        ),
+        python_sandbox_max_output_chars=max(
+            int_setting("FRUITSPY_PYTHON_SANDBOX_MAX_OUTPUT_CHARS", "python_sandbox_max_output_chars", 12000),
+            256,
+        ),
+        python_sandbox_max_code_bytes=max(
+            int_setting("FRUITSPY_PYTHON_SANDBOX_MAX_CODE_BYTES", "python_sandbox_max_code_bytes", 65536),
+            256,
+        ),
+        python_sandbox_cpu_count=max(python_sandbox_cpu_count, 0.1),
+        python_sandbox_memory_mb=max(
+            int_setting("FRUITSPY_PYTHON_SANDBOX_MEMORY_MB", "python_sandbox_memory_mb", 256),
+            64,
+        ),
+        python_sandbox_max_concurrency=max(
+            int_setting("FRUITSPY_PYTHON_SANDBOX_MAX_CONCURRENCY", "python_sandbox_max_concurrency", 1),
+            1,
+        ),
+        python_sandbox_max_artifacts=max(
+            int_setting("FRUITSPY_PYTHON_SANDBOX_MAX_ARTIFACTS", "python_sandbox_max_artifacts", 4),
+            0,
+        ),
+        python_sandbox_max_artifact_bytes=max(
+            int_setting(
+                "FRUITSPY_PYTHON_SANDBOX_MAX_ARTIFACT_BYTES",
+                "python_sandbox_max_artifact_bytes",
+                2 * 1024 * 1024,
+            ),
+            1024,
+        ),
+        python_sandbox_max_artifact_total_bytes=max(
+            int_setting(
+                "FRUITSPY_PYTHON_SANDBOX_MAX_ARTIFACT_TOTAL_BYTES",
+                "python_sandbox_max_artifact_total_bytes",
+                4 * 1024 * 1024,
+            ),
+            1024,
+        ),
+        python_sandbox_artifact_ttl_seconds=max(
+            int_setting(
+                "FRUITSPY_PYTHON_SANDBOX_ARTIFACT_TTL_SECONDS",
+                "python_sandbox_artifact_ttl_seconds",
+                600,
+            ),
+            1,
+        ),
+        python_tool_state_path=python_tool_state_path,
     )

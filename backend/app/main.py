@@ -9,11 +9,17 @@ from fastapi import FastAPI, Header, HTTPException, Query, WebSocket, WebSocketD
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.python_tool import create_python_tool_router
 from app.config import load_runtime_config
 from app.models.schemas import PackageInventory, Snapshot
 from app.services.apple_container_runtime import AppleContainerRuntime
 from app.services.host_metrics import HostMetricsService
 from app.services.package_inventory import PackageInventoryService
+from app.services.python_tool import (
+    ApplePythonSandboxRunner,
+    PythonToolService,
+    PythonToolStateStore,
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 BACKEND_ROOT = PROJECT_ROOT / "backend"
@@ -45,8 +51,45 @@ container_service = AppleContainerRuntime(
     auto_start=RUNTIME_CONFIG.container_auto_start,
 )
 package_inventory_service = PackageInventoryService()
+python_sandbox_runner = ApplePythonSandboxRunner(
+    image=RUNTIME_CONFIG.python_sandbox_image,
+    network=RUNTIME_CONFIG.python_sandbox_network,
+    cpu_count=RUNTIME_CONFIG.python_sandbox_cpu_count,
+    memory_mb=RUNTIME_CONFIG.python_sandbox_memory_mb,
+    max_artifact_bytes=RUNTIME_CONFIG.python_sandbox_max_artifact_bytes,
+    max_artifact_total_bytes=RUNTIME_CONFIG.python_sandbox_max_artifact_total_bytes,
+    cli_path=RUNTIME_CONFIG.apple_container_cli,
+)
+python_tool_service = PythonToolService(
+    runner=python_sandbox_runner,
+    state_store=PythonToolStateStore(RUNTIME_CONFIG.python_tool_state_path),
+    default_enabled=RUNTIME_CONFIG.python_tool_enabled,
+    token_configured=bool(RUNTIME_CONFIG.python_tool_token),
+    timeout_seconds=RUNTIME_CONFIG.python_sandbox_timeout_seconds,
+    max_output_chars=RUNTIME_CONFIG.python_sandbox_max_output_chars,
+    max_code_bytes=RUNTIME_CONFIG.python_sandbox_max_code_bytes,
+    cpu_count=RUNTIME_CONFIG.python_sandbox_cpu_count,
+    memory_mb=RUNTIME_CONFIG.python_sandbox_memory_mb,
+    max_concurrency=RUNTIME_CONFIG.python_sandbox_max_concurrency,
+    max_artifacts=RUNTIME_CONFIG.python_sandbox_max_artifacts,
+    max_artifact_bytes=RUNTIME_CONFIG.python_sandbox_max_artifact_bytes,
+    max_artifact_total_bytes=RUNTIME_CONFIG.python_sandbox_max_artifact_total_bytes,
+    artifact_ttl_seconds=RUNTIME_CONFIG.python_sandbox_artifact_ttl_seconds,
+)
 
 app = FastAPI(title="FruitSpy")
+app.include_router(
+    create_python_tool_router(
+        service=python_tool_service,
+        token=RUNTIME_CONFIG.python_tool_token,
+        allowed_cidrs=RUNTIME_CONFIG.python_tool_allowed_cidrs,
+    )
+)
+
+
+@app.on_event("startup")
+async def initialize_python_tool() -> None:
+    await asyncio.to_thread(python_tool_service.initialize)
 
 
 def collect_snapshot() -> Snapshot:

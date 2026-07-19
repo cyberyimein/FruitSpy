@@ -3,6 +3,7 @@ import ConnectionIndicator from './components/ConnectionIndicator';
 import ContainerPanel from './components/ContainerPanel';
 import HostDashboard from './components/HostDashboard';
 import PackageInventoryPanel from './components/PackageInventoryPanel';
+import PythonToolPanel from './components/PythonToolPanel';
 import { DashboardSocket, type ConnectionState } from './lib/socket';
 import type { RuntimeConfig, Snapshot } from './lib/types';
 
@@ -143,6 +144,7 @@ export default function App() {
                         controlEnabled={config.container_control_enabled}
                     />
                 )}
+                {activePage === 'api' && <PythonToolPanel />}
             </main>
         </div>
     );

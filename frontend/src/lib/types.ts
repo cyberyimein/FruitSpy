@@ -57,3 +57,33 @@ export type PackageInventory = {
     total_packages: number;
     managers: PackageManagerInventory[];
 };
+
+export type PythonToolState = 'disabled' | 'checking' | 'ready' | 'busy' | 'degraded' | 'disabling';
+
+export type PythonToolStatus = {
+    schema_version: number;
+    id: string;
+    enabled: boolean;
+    state: PythonToolState;
+    ready: boolean;
+    image: string;
+    limits: {
+        cpu_count: number;
+        memory_mb: number;
+        timeout_ms: number;
+        max_code_bytes: number;
+        max_output_chars: number;
+        max_concurrency: number;
+        max_artifacts: number;
+        max_artifact_bytes: number;
+        max_artifact_total_bytes: number;
+        artifact_ttl_seconds: number;
+    };
+    running_executions: number;
+    last_execution: {
+        finished_at: string;
+        status: 'succeeded' | 'failed' | 'timed_out';
+        duration_ms: number;
+    } | null;
+    error: string | null;
+};
