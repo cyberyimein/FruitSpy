@@ -28,12 +28,38 @@ else
   exit 1
 fi
 
-PY_BIN="$(command -v python3.14 || command -v python3)"
+PY_BIN=""
+for name in python3.13 python3.12 python3.11 python3.10; do
+  candidate="$(command -v "$name" 2>/dev/null || true)"
+  if [[ -n "$candidate" ]]; then
+    PY_BIN="$candidate"
+    break
+  fi
+done
+if [[ -z "$PY_BIN" ]]; then
+  for candidate in \
+    "$HOME/miniforge3/bin/python3.13" \
+    "/opt/homebrew/Caskroom/miniforge/base/bin/python3.13" \
+    "/opt/homebrew/bin/python3.13" \
+    "/usr/local/bin/python3.13"; do
+    if [[ -x "$candidate" ]]; then
+      PY_BIN="$candidate"
+      break
+    fi
+  done
+fi
+
+if [[ -z "$PY_BIN" ]]; then
+  echo "FruitSpy Crawl API requires Python 3.10-3.13" >&2
+  exit 1
+fi
 
 mkdir -p "$(dirname "$VENV_DIR")"
 
 if [[ ! -d "$VENV_DIR" ]]; then
   "$PY_BIN" -m venv "$VENV_DIR"
+elif ! "$VENV_DIR/bin/python" -c 'import sys; raise SystemExit(not ((3, 10) <= sys.version_info[:2] <= (3, 13)))'; then
+  "$PY_BIN" -m venv --clear "$VENV_DIR"
 fi
 
 source "$VENV_DIR/bin/activate"
@@ -43,6 +69,10 @@ STAMP_FILE="$VENV_DIR/.deps_installed"
 if [[ ! -f "$STAMP_FILE" || "$REQ_FILE" -nt "$STAMP_FILE" ]]; then
   pip install -r "$REQ_FILE"
   touch "$STAMP_FILE"
+fi
+
+if ! python -c 'from pathlib import Path; from playwright.sync_api import sync_playwright; p = sync_playwright().start(); ok = Path(p.chromium.executable_path).exists(); p.stop(); raise SystemExit(not ok)'; then
+  python -m playwright install chromium
 fi
 
 export PYTHONPATH="$BACKEND_DIR"

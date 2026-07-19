@@ -9,10 +9,12 @@ from fastapi import FastAPI, Header, HTTPException, Query, WebSocket, WebSocketD
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.api.crawl_tool import create_crawl_tool_router
 from app.api.python_tool import create_python_tool_router
 from app.config import load_runtime_config
 from app.models.schemas import PackageInventory, Snapshot
 from app.services.apple_container_runtime import AppleContainerRuntime
+from app.services.crawl_tool import Crawl4AIBackend, CrawlToolService
 from app.services.host_metrics import HostMetricsService
 from app.services.package_inventory import PackageInventoryService
 from app.services.python_tool import (
@@ -76,8 +78,25 @@ python_tool_service = PythonToolService(
     max_artifact_total_bytes=RUNTIME_CONFIG.python_sandbox_max_artifact_total_bytes,
     artifact_ttl_seconds=RUNTIME_CONFIG.python_sandbox_artifact_ttl_seconds,
 )
+crawl_tool_service = CrawlToolService(
+    backend=Crawl4AIBackend(base_directory=RUNTIME_CONFIG.crawl_base_directory),
+    enabled=RUNTIME_CONFIG.crawl_api_enabled,
+    default_timeout_ms=RUNTIME_CONFIG.crawl_default_timeout_ms,
+    max_timeout_ms=RUNTIME_CONFIG.crawl_max_timeout_ms,
+    max_concurrency=RUNTIME_CONFIG.crawl_max_concurrency,
+    max_queue=RUNTIME_CONFIG.crawl_max_queue,
+    max_redirects=RUNTIME_CONFIG.crawl_max_redirects,
+    max_response_bytes=RUNTIME_CONFIG.crawl_max_response_bytes,
+    max_html_bytes=RUNTIME_CONFIG.crawl_max_html_bytes,
+)
 
 app = FastAPI(title="FruitSpy")
+app.include_router(
+    create_crawl_tool_router(
+        service=crawl_tool_service,
+        token=RUNTIME_CONFIG.crawl_api_token,
+    )
+)
 app.include_router(
     create_python_tool_router(
         service=python_tool_service,
@@ -90,6 +109,11 @@ app.include_router(
 @app.on_event("startup")
 async def initialize_python_tool() -> None:
     await asyncio.to_thread(python_tool_service.initialize)
+
+
+@app.on_event("startup")
+async def initialize_crawl_tool() -> None:
+    await crawl_tool_service.initialize()
 
 
 def collect_snapshot() -> Snapshot:

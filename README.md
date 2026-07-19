@@ -11,6 +11,7 @@ FruitSpy is a lightweight macOS host and Apple container dashboard for LAN use.
 - Optional start, stop, and restart controls
 - A local Python Tool relay that executes Anomalo requests from loopback or an allowlisted container network
 - Optional short-lived `/tmp` artifact downloads for plots and small result files
+- A controlled Crawl4AI endpoint that renders public JavaScript pages into Markdown for Anomalo
 
 ## Architecture
 
@@ -25,6 +26,7 @@ The app is designed to run directly on the macOS host (not in Docker) so host me
 - Apple silicon Mac
 - macOS 26 or newer
 - [Apple container](https://github.com/apple/container) 1.0 or newer
+- Python 3.10–3.13 (Crawl4AI 0.9.2 does not support Python 3.14)
 
 Install Apple container with Homebrew, then install its recommended Linux kernel and start it:
 
@@ -119,6 +121,16 @@ The menu bar app provides:
 - `FRUITSPY_PYTHON_SANDBOX_MAX_ARTIFACT_BYTES` (default `2097152`)
 - `FRUITSPY_PYTHON_SANDBOX_MAX_ARTIFACT_TOTAL_BYTES` (default `4194304`)
 - `FRUITSPY_PYTHON_SANDBOX_ARTIFACT_TTL_SECONDS` (default `600`)
+- `FRUITSPY_CRAWL_API_ENABLED` (default `true`)
+- `FRUITSPY_CRAWL_API_TOKEN` (optional; falls back to `FRUITSPY_PYTHON_TOOL_TOKEN`)
+- `FRUITSPY_CRAWL_DEFAULT_TIMEOUT_MS` (default `30000`)
+- `FRUITSPY_CRAWL_MAX_TIMEOUT_MS` (default and hard maximum `60000`)
+- `FRUITSPY_CRAWL_MAX_CONCURRENCY` (default `2`)
+- `FRUITSPY_CRAWL_MAX_QUEUE` (default `10`)
+- `FRUITSPY_CRAWL_MAX_REDIRECTS` (default `5`, hard maximum `10`)
+- `FRUITSPY_CRAWL_MAX_RESPONSE_BYTES` (default `2000000`)
+- `FRUITSPY_CRAWL_MAX_HTML_BYTES` (default `8388608`)
+- `FRUITSPY_CRAWL_BASE_DIRECTORY` (default `runtime/crawl`)
 
 ## Config Files
 
@@ -146,6 +158,16 @@ Optional keys in config JSON:
 - `python_sandbox_cpu_count`
 - `python_sandbox_memory_mb`
 - `python_sandbox_max_concurrency`
+- `crawl_api_enabled`
+- `crawl_api_token`
+- `crawl_default_timeout_ms`
+- `crawl_max_timeout_ms`
+- `crawl_max_concurrency`
+- `crawl_max_queue`
+- `crawl_max_redirects`
+- `crawl_max_response_bytes`
+- `crawl_max_html_bytes`
+- `crawl_base_directory`
 
 Container controls are disabled in the committed template because FruitSpy currently has no
 authentication and listens on the LAN. Enable them only on a trusted network. Control requests
@@ -172,6 +194,18 @@ then removes the container. The execution endpoint accepts loopback and the expl
 Build the sandbox image in Apple container's image store and configure the same random token in
 FruitSpy and Anomalo before enabling the card. See
 [docs/python-tool-api.md](docs/python-tool-api.md) for setup and protocol details.
+
+## Crawl4AI Relay
+
+FruitSpy exposes `POST /api/v1/tools/crawl` for Anomalo `web_fetch`. Each request gets a fresh
+headless Chromium browser, and every main navigation, redirect, and HTTP(S) subresource is checked
+against the public-network URL policy. The endpoint has a total timeout, bounded queue, response
+size limits, download/media blocking, and optional Bearer authentication.
+
+The build and development scripts install the pinned Crawl4AI package and its Chromium runtime.
+Use Python 3.10–3.13; the scripts prefer 3.13 and reject unsupported Python versions. See
+[docs/crawl-tool-api.md](docs/crawl-tool-api.md) for the API contract, configuration, and Anomalo
+setup.
 
 ## Notes
 

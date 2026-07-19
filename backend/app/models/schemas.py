@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class HostMetrics(BaseModel):
@@ -139,3 +139,63 @@ class PythonExecutionResponse(BaseModel):
     image: str
     artifacts: list[PythonArtifactResponse] = Field(default_factory=list)
     artifact_errors: list[PythonArtifactError] = Field(default_factory=list)
+
+
+class CrawlRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    url: str = Field(min_length=1, max_length=4096)
+    wait_for: None = None
+    timeout_ms: Optional[int] = Field(default=None, ge=1000, le=60000)
+
+
+class CrawlTimings(BaseModel):
+    queue_ms: int = 0
+    navigation_ms: int = 0
+    render_ms: int = 0
+    extract_ms: int = 0
+    total_ms: int = 0
+
+
+class CrawlMetrics(BaseModel):
+    html_bytes: int = 0
+    markdown_chars: int = 0
+    links_seen: int = 0
+
+
+class CrawlResponse(BaseModel):
+    schema_version: int = 1
+    crawl_id: str
+    ok: bool = True
+    url: str
+    final_url: str
+    title: str = ""
+    markdown: str
+    status_code: int
+    rendered: bool = True
+    content_type: str = "text/html"
+    timings: CrawlTimings
+    metrics: CrawlMetrics
+    warnings: list[str] = Field(default_factory=list)
+
+
+class CrawlToolLimits(BaseModel):
+    max_concurrency: int
+    max_queue: int
+    timeout_ms: int
+    max_timeout_ms: int
+    max_redirects: int
+    max_response_bytes: int
+    max_html_bytes: int
+
+
+class CrawlToolStatus(BaseModel):
+    schema_version: int = 1
+    id: str = "crawl4ai"
+    enabled: bool
+    state: Literal["disabled", "checking", "ready", "busy", "degraded"]
+    ready: bool
+    running_executions: int
+    queued_executions: int
+    limits: CrawlToolLimits
+    error: Optional[str] = None

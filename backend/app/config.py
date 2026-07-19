@@ -33,6 +33,16 @@ class RuntimeConfig:
     python_sandbox_max_artifact_total_bytes: int
     python_sandbox_artifact_ttl_seconds: int
     python_tool_state_path: str
+    crawl_api_enabled: bool
+    crawl_api_token: str
+    crawl_default_timeout_ms: int
+    crawl_max_timeout_ms: int
+    crawl_max_concurrency: int
+    crawl_max_queue: int
+    crawl_max_redirects: int
+    crawl_max_response_bytes: int
+    crawl_max_html_bytes: int
+    crawl_base_directory: str
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -155,6 +165,20 @@ def load_runtime_config() -> RuntimeConfig:
         "FRUITSPY_PYTHON_TOOL_STATE_PATH",
         str(config_data.get("python_tool_state_path", runtime_dir / "state.json")),
     )
+    crawl_api_enabled = _bool_value(
+        os.getenv("FRUITSPY_CRAWL_API_ENABLED", config_data.get("crawl_api_enabled", True)),
+        True,
+    )
+    crawl_api_token = os.getenv(
+        "FRUITSPY_CRAWL_API_TOKEN",
+        str(config_data.get("crawl_api_token", "")),
+    ).strip()
+    if not crawl_api_token:
+        crawl_api_token = python_tool_token
+    crawl_base_directory = os.getenv(
+        "FRUITSPY_CRAWL_BASE_DIRECTORY",
+        str(config_data.get("crawl_base_directory", runtime_dir / "crawl")),
+    )
 
     return RuntimeConfig(
         apple_container_cli=apple_container_cli,
@@ -220,4 +244,77 @@ def load_runtime_config() -> RuntimeConfig:
             1,
         ),
         python_tool_state_path=python_tool_state_path,
+        crawl_api_enabled=crawl_api_enabled,
+        crawl_api_token=crawl_api_token,
+        crawl_default_timeout_ms=min(
+            max(
+                int_setting(
+                    "FRUITSPY_CRAWL_DEFAULT_TIMEOUT_MS",
+                    "crawl_default_timeout_ms",
+                    30000,
+                ),
+                1000,
+            ),
+            60000,
+        ),
+        crawl_max_timeout_ms=min(
+            max(
+                int_setting(
+                    "FRUITSPY_CRAWL_MAX_TIMEOUT_MS",
+                    "crawl_max_timeout_ms",
+                    60000,
+                ),
+                1000,
+            ),
+            60000,
+        ),
+        crawl_max_concurrency=max(
+            min(
+                int_setting(
+                    "FRUITSPY_CRAWL_MAX_CONCURRENCY",
+                    "crawl_max_concurrency",
+                    2,
+                ),
+                8,
+            ),
+            1,
+        ),
+        crawl_max_queue=min(
+            max(
+                int_setting("FRUITSPY_CRAWL_MAX_QUEUE", "crawl_max_queue", 10),
+                0,
+            ),
+            100,
+        ),
+        crawl_max_redirects=min(
+            max(
+                int_setting(
+                    "FRUITSPY_CRAWL_MAX_REDIRECTS",
+                    "crawl_max_redirects",
+                    5,
+                ),
+                0,
+            ),
+            10,
+        ),
+        crawl_max_response_bytes=max(
+            int_setting(
+                "FRUITSPY_CRAWL_MAX_RESPONSE_BYTES",
+                "crawl_max_response_bytes",
+                2_000_000,
+            ),
+            1024,
+        ),
+        crawl_max_html_bytes=min(
+            max(
+                int_setting(
+                    "FRUITSPY_CRAWL_MAX_HTML_BYTES",
+                    "crawl_max_html_bytes",
+                    8 * 1024 * 1024,
+                ),
+                1024,
+            ),
+            10 * 1024 * 1024,
+        ),
+        crawl_base_directory=crawl_base_directory,
     )
