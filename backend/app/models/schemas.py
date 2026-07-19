@@ -193,9 +193,14 @@ class CrawlToolStatus(BaseModel):
     schema_version: int = 1
     id: str = "crawl4ai"
     enabled: bool
-    state: Literal["disabled", "checking", "ready", "busy", "degraded"]
+    state: Literal["disabled", "checking", "ready", "busy", "degraded", "disabling"]
     ready: bool
+    authentication_configured: bool
     running_executions: int
     queued_executions: int
     limits: CrawlToolLimits
     error: Optional[str] = None
+
+
+class CrawlToolEnableRequest(BaseModel):
+    enabled: bool

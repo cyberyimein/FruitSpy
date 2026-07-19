@@ -43,6 +43,7 @@ class RuntimeConfig:
     crawl_max_response_bytes: int
     crawl_max_html_bytes: int
     crawl_base_directory: str
+    crawl_tool_state_path: str
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -178,6 +179,10 @@ def load_runtime_config() -> RuntimeConfig:
     crawl_base_directory = os.getenv(
         "FRUITSPY_CRAWL_BASE_DIRECTORY",
         str(config_data.get("crawl_base_directory", runtime_dir / "crawl")),
+    )
+    crawl_tool_state_path = os.getenv(
+        "FRUITSPY_CRAWL_TOOL_STATE_PATH",
+        str(config_data.get("crawl_tool_state_path", runtime_dir / "state.json")),
     )
 
     return RuntimeConfig(
@@ -317,4 +322,5 @@ def load_runtime_config() -> RuntimeConfig:
             10 * 1024 * 1024,
         ),
         crawl_base_directory=crawl_base_directory,
+        crawl_tool_state_path=crawl_tool_state_path,
     )

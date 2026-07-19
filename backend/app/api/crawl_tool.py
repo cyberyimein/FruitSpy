@@ -8,7 +8,7 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
-from app.models.schemas import CrawlRequest
+from app.models.schemas import CrawlRequest, CrawlToolEnableRequest
 from app.services.crawl_tool import CrawlToolError, CrawlToolService
 
 logger = logging.getLogger("fruitspy.crawl")
@@ -53,19 +53,7 @@ def create_crawl_tool_router(*, service: CrawlToolService, token: str) -> APIRou
     def crawl_status():
         return service.status()
 
-    @router.post("")
-    async def crawl(
-        request: Request,
-        authorization: str = Header(default=""),
-    ):
-        if token and not _has_valid_token(authorization, token):
-            return _error_response(
-                status_code=401,
-                code="unauthorized",
-                message="A valid Crawl API bearer token is required",
-                retryable=False,
-            )
-
+    async def execute_crawl(request: Request):
         try:
             media_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
             if media_type != "application/json":
@@ -105,5 +93,47 @@ def create_crawl_tool_router(*, service: CrawlToolService, token: str) -> APIRou
                 message="Crawler failed unexpectedly",
                 retryable=True,
             )
+
+    @router.put("/enabled")
+    async def set_crawl_enabled(
+        payload: CrawlToolEnableRequest,
+        x_fruitspy_control: str = Header(default=""),
+    ):
+        if x_fruitspy_control != "1":
+            return _error_response(
+                status_code=403,
+                code="control_header_required",
+                message="Missing FruitSpy control header",
+                retryable=False,
+            )
+        return await service.set_enabled(payload.enabled)
+
+    @router.post("/test")
+    async def test_crawl(
+        request: Request,
+        x_fruitspy_control: str = Header(default=""),
+    ):
+        if x_fruitspy_control != "1":
+            return _error_response(
+                status_code=403,
+                code="control_header_required",
+                message="Missing FruitSpy control header",
+                retryable=False,
+            )
+        return await execute_crawl(request)
+
+    @router.post("")
+    async def crawl(
+        request: Request,
+        authorization: str = Header(default=""),
+    ):
+        if token and not _has_valid_token(authorization, token):
+            return _error_response(
+                status_code=401,
+                code="unauthorized",
+                message="A valid Crawl API bearer token is required",
+                retryable=False,
+            )
+        return await execute_crawl(request)
 
     return router

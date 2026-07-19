@@ -14,7 +14,7 @@ from app.api.python_tool import create_python_tool_router
 from app.config import load_runtime_config
 from app.models.schemas import PackageInventory, Snapshot
 from app.services.apple_container_runtime import AppleContainerRuntime
-from app.services.crawl_tool import Crawl4AIBackend, CrawlToolService
+from app.services.crawl_tool import Crawl4AIBackend, CrawlToolService, CrawlToolStateStore
 from app.services.host_metrics import HostMetricsService
 from app.services.package_inventory import PackageInventoryService
 from app.services.python_tool import (
@@ -80,7 +80,9 @@ python_tool_service = PythonToolService(
 )
 crawl_tool_service = CrawlToolService(
     backend=Crawl4AIBackend(base_directory=RUNTIME_CONFIG.crawl_base_directory),
-    enabled=RUNTIME_CONFIG.crawl_api_enabled,
+    state_store=CrawlToolStateStore(RUNTIME_CONFIG.crawl_tool_state_path),
+    default_enabled=RUNTIME_CONFIG.crawl_api_enabled,
+    token_configured=bool(RUNTIME_CONFIG.crawl_api_token),
     default_timeout_ms=RUNTIME_CONFIG.crawl_default_timeout_ms,
     max_timeout_ms=RUNTIME_CONFIG.crawl_max_timeout_ms,
     max_concurrency=RUNTIME_CONFIG.crawl_max_concurrency,

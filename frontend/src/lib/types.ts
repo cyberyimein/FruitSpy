@@ -87,3 +87,52 @@ export type PythonToolStatus = {
     } | null;
     error: string | null;
 };
+
+export type CrawlToolState = 'disabled' | 'checking' | 'ready' | 'busy' | 'degraded' | 'disabling';
+
+export type CrawlToolStatus = {
+    schema_version: number;
+    id: string;
+    enabled: boolean;
+    state: CrawlToolState;
+    ready: boolean;
+    authentication_configured: boolean;
+    running_executions: number;
+    queued_executions: number;
+    limits: {
+        max_concurrency: number;
+        max_queue: number;
+        timeout_ms: number;
+        max_timeout_ms: number;
+        max_redirects: number;
+        max_response_bytes: number;
+        max_html_bytes: number;
+    };
+    error: string | null;
+};
+
+export type CrawlResult = {
+    schema_version: number;
+    crawl_id: string;
+    ok: boolean;
+    url: string;
+    final_url: string;
+    title: string;
+    markdown: string;
+    status_code: number;
+    rendered: boolean;
+    content_type: string;
+    timings: {
+        queue_ms: number;
+        navigation_ms: number;
+        render_ms: number;
+        extract_ms: number;
+        total_ms: number;
+    };
+    metrics: {
+        html_bytes: number;
+        markdown_chars: number;
+        links_seen: number;
+    };
+    warnings: string[];
+};

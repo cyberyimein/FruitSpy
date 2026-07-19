@@ -10,7 +10,7 @@ import socket
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Awaitable, Callable, Optional, Protocol, Sequence
+from typing import Any, Awaitable, Callable, Optional, Protocol, Sequence
 from urllib.parse import urlsplit, urlunsplit
 from uuid import uuid4
 
@@ -73,6 +73,42 @@ class CrawlerUnavailableError(CrawlToolError):
     code = "crawler_unavailable"
     status_code = 503
     retryable = True
+
+
+class CrawlToolDisabledError(CrawlToolError):
+    code = "feature_disabled"
+    status_code = 409
+
+
+class CrawlToolStateStore:
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path).expanduser()
+
+    def load_enabled(self, default: bool) -> bool:
+        try:
+            payload = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return default
+        value = payload.get("crawl_tool_enabled") if isinstance(payload, dict) else None
+        return value if isinstance(value, bool) else default
+
+    def save_enabled(self, enabled: bool) -> None:
+        payload: dict[str, Any] = {}
+        try:
+            current = json.loads(self.path.read_text(encoding="utf-8"))
+            if isinstance(current, dict):
+                payload.update(current)
+        except (OSError, json.JSONDecodeError):
+            pass
+
+        payload["crawl_tool_enabled"] = enabled
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        temp_path = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
+        temp_path.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+        os.replace(temp_path, self.path)
 
 
 async def _system_resolver(hostname: str) -> Sequence[str]:
@@ -600,6 +636,8 @@ class _CapacityGate:
         self._lock = asyncio.Lock()
         self._accepted = 0
         self._running = 0
+        self._waiters: set[asyncio.Task] = set()
+        self._disabled_waiters: set[asyncio.Task] = set()
 
     @property
     def running(self) -> int:
@@ -610,23 +648,50 @@ class _CapacityGate:
         return max(self._accepted - self._running, 0)
 
     async def acquire(self, deadline: float) -> None:
+        task = asyncio.current_task()
+        if task is None:
+            raise RuntimeError("Crawler capacity gate requires an asyncio task")
+        slot_acquired = False
         async with self._lock:
             if self._accepted >= self.max_concurrency + self.max_queue:
                 raise CapacityExceededError("Crawler concurrency and queue capacity are full")
             self._accepted += 1
+            self._waiters.add(task)
 
         try:
             remaining = deadline - time.monotonic()
             if remaining <= 0:
                 raise asyncio.TimeoutError
             await asyncio.wait_for(self._semaphore.acquire(), timeout=remaining)
+            slot_acquired = True
+            async with self._lock:
+                self._waiters.discard(task)
+                self._running += 1
+        except asyncio.CancelledError as exc:
+            async with self._lock:
+                disabled = task in self._disabled_waiters
+                self._disabled_waiters.discard(task)
+                self._waiters.discard(task)
+                self._accepted -= 1
+            if slot_acquired:
+                self._semaphore.release()
+            if disabled:
+                raise CrawlToolDisabledError("Crawler was disabled while the request was queued") from exc
+            raise
         except BaseException:
             async with self._lock:
+                self._waiters.discard(task)
                 self._accepted -= 1
+            if slot_acquired:
+                self._semaphore.release()
             raise
 
+    async def cancel_queued(self) -> None:
         async with self._lock:
-            self._running += 1
+            waiters = tuple(self._waiters)
+            self._disabled_waiters.update(waiters)
+        for task in waiters:
+            task.cancel()
 
     async def release(self) -> None:
         async with self._lock:
@@ -668,7 +733,9 @@ class CrawlToolService:
         self,
         *,
         backend: CrawlBackend,
-        enabled: bool,
+        state_store: CrawlToolStateStore,
+        default_enabled: bool,
+        token_configured: bool,
         default_timeout_ms: int,
         max_timeout_ms: int,
         max_concurrency: int,
@@ -679,7 +746,9 @@ class CrawlToolService:
         policy: Optional[PublicURLPolicy] = None,
     ) -> None:
         self.backend = backend
-        self.enabled = enabled
+        self._state_store = state_store
+        self.enabled = state_store.load_enabled(default_enabled)
+        self.token_configured = token_configured
         self.default_timeout_ms = min(default_timeout_ms, max_timeout_ms)
         self.max_timeout_ms = max_timeout_ms
         self.max_redirects = max_redirects
@@ -688,9 +757,10 @@ class CrawlToolService:
         self.policy = policy or PublicURLPolicy()
         self._gate = _CapacityGate(max_concurrency, max_queue)
         self._ready = False
-        self._state = "disabled" if not enabled else "checking"
+        self._state = "disabled" if not self.enabled else "checking"
         self._error: Optional[str] = None
         self._initialize_lock = asyncio.Lock()
+        self._control_lock = asyncio.Lock()
         self._initialized = False
 
     async def initialize(self) -> None:
@@ -700,21 +770,42 @@ class CrawlToolService:
             self._initialized = True
             if not self.enabled:
                 return
-            self._state = "checking"
-            try:
-                await self.backend.preflight()
-            except CrawlToolError as exc:
-                self._ready = False
-                self._state = "degraded"
-                self._error = str(exc)
-            except Exception:
-                self._ready = False
-                self._state = "degraded"
-                self._error = "Crawl4AI preflight failed"
-            else:
+            async with self._control_lock:
+                if self.enabled:
+                    await self._preflight()
+
+    async def _preflight(self) -> None:
+        self._state = "checking"
+        self._ready = False
+        self._error = None
+        try:
+            await self.backend.preflight()
+        except CrawlToolError as exc:
+            self._state = "degraded"
+            self._error = str(exc)
+        except Exception:
+            self._state = "degraded"
+            self._error = "Crawl4AI preflight failed"
+        else:
+            if self.enabled:
                 self._ready = True
-                self._state = "ready"
-                self._error = None
+                self._state = "busy" if self._gate.running else "ready"
+            else:
+                self._state = "disabling" if self._gate.running else "disabled"
+
+    async def set_enabled(self, enabled: bool) -> CrawlToolStatus:
+        async with self._control_lock:
+            await asyncio.to_thread(self._state_store.save_enabled, enabled)
+            self.enabled = enabled
+            self._error = None
+            if not enabled:
+                self._ready = False
+                self._state = "disabling" if self._gate.running else "disabled"
+                await self._gate.cancel_queued()
+                return self.status()
+
+            await self._preflight()
+            return self.status()
 
     def status(self) -> CrawlToolStatus:
         state = self._state
@@ -724,6 +815,7 @@ class CrawlToolService:
             enabled=self.enabled,
             state=state,
             ready=self._ready,
+            authentication_configured=self.token_configured,
             running_executions=self._gate.running,
             queued_executions=self._gate.queued,
             limits=CrawlToolLimits(
@@ -740,7 +832,7 @@ class CrawlToolService:
 
     async def crawl(self, *, url: str, timeout_ms: Optional[int]) -> CrawlResponse:
         if not self.enabled:
-            raise CrawlerUnavailableError("Crawler is disabled")
+            raise CrawlToolDisabledError("Crawler is disabled in FruitSpy")
         if not self._initialized:
             await self.initialize()
         if not self._ready:
@@ -756,6 +848,8 @@ class CrawlToolService:
         try:
             await self._gate.acquire(deadline)
             acquired = True
+            if not self.enabled:
+                raise CrawlToolDisabledError("Crawler is disabled in FruitSpy")
             queue_ms = int((time.monotonic() - started_at) * 1000)
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -854,3 +948,7 @@ class CrawlToolService:
         finally:
             if acquired:
                 await self._gate.release()
+                if not self.enabled:
+                    self._state = "disabling" if self._gate.running else "disabled"
+                elif self._ready:
+                    self._state = "busy" if self._gate.running else "ready"

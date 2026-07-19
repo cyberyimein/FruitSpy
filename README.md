@@ -168,6 +168,7 @@ Optional keys in config JSON:
 - `crawl_max_response_bytes`
 - `crawl_max_html_bytes`
 - `crawl_base_directory`
+- `crawl_tool_state_path` (defaults to the shared runtime `state.json`)
 
 Container controls are disabled in the committed template because FruitSpy currently has no
 authentication and listens on the LAN. Enable them only on a trusted network. Control requests

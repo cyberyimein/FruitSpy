@@ -55,6 +55,7 @@ Accept: application/json
   "enabled": true,
   "state": "ready",
   "ready": true,
+  "authentication_configured": true,
   "running_executions": 0,
   "queued_executions": 0,
   "limits": {
@@ -72,6 +73,32 @@ Accept: application/json
 
 Chromium 或 Crawl4AI 不可用时，FruitSpy 本身仍会启动，但状态为 `degraded`、`ready` 为
 `false`，抓取请求返回 `503 crawler_unavailable`。
+
+## Dashboard 管理接口
+
+API 页通过本地管理接口启用或禁用 Crawl4AI：
+
+```http
+PUT /api/v1/tools/crawl/enabled
+Content-Type: application/json
+X-FruitSpy-Control: 1
+
+{"enabled": false}
+```
+
+禁用后立即拒绝新请求，排队请求返回 `409 feature_disabled`，已经运行的请求则可在原有
+超时预算内完成。运行数归零前状态为 `disabling`，之后为 `disabled`。开关保存在
+`crawl_tool_state_path`，服务重启后仍然有效。
+
+Dashboard 测试台使用服务端管理接口，因此不会把 Bearer token 暴露给浏览器：
+
+```http
+POST /api/v1/tools/crawl/test
+Content-Type: application/json
+X-FruitSpy-Control: 1
+
+{"url": "https://example.com/", "timeout_ms": 30000}
+```
 
 ## 抓取接口
 

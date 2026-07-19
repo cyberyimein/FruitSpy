@@ -17,7 +17,9 @@ from app.services.crawl_tool import (
     CapacityExceededError,
     ContentNotExtractableError,
     CrawlBackendResult,
+    CrawlToolDisabledError,
     CrawlToolService,
+    CrawlToolStateStore,
     NetworkGuard,
     NavigationTimeoutError,
     PinnedPublicResolver,
@@ -77,10 +79,13 @@ def build_service(
     max_concurrency: int = 2,
     max_queue: int = 10,
     max_response_bytes: int = 2_000_000,
+    state_store: CrawlToolStateStore | None = None,
 ) -> CrawlToolService:
     return CrawlToolService(
         backend=backend,
-        enabled=True,
+        state_store=state_store or CrawlToolStateStore(Path(tempfile.mkdtemp()) / "state.json"),
+        default_enabled=True,
+        token_configured=True,
         default_timeout_ms=30_000,
         max_timeout_ms=60_000,
         max_concurrency=max_concurrency,
@@ -254,8 +259,61 @@ class CrawlToolServiceTests(unittest.IsolatedAsyncioTestCase):
 
         self.assertEqual(initial.id, "crawl4ai")
         self.assertFalse(initial.ready)
+        self.assertTrue(initial.authentication_configured)
         self.assertEqual(initial.limits.max_concurrency, 2)
         self.assertEqual(initial.limits.max_response_bytes, 2_000_000)
+
+    async def test_disable_cancels_queue_but_allows_running_crawl_to_finish(self) -> None:
+        backend = BlockingCrawlBackend()
+        service = build_service(backend, max_concurrency=1, max_queue=1)
+        await service.initialize()
+        running = asyncio.create_task(
+            service.crawl(url="https://example.com/running", timeout_ms=30_000)
+        )
+        await backend.started.wait()
+        queued = asyncio.create_task(
+            service.crawl(url="https://example.com/queued", timeout_ms=30_000)
+        )
+        while service.status().queued_executions != 1:
+            await asyncio.sleep(0)
+
+        disabled = await service.set_enabled(False)
+
+        self.assertEqual(disabled.state, "disabling")
+        with self.assertRaises(CrawlToolDisabledError):
+            await queued
+        self.assertFalse(running.done())
+        backend.release.set()
+        await running
+        self.assertEqual(service.status().state, "disabled")
+
+    async def test_enable_disable_state_is_persisted_and_enable_preflights(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            state_store = CrawlToolStateStore(Path(temp_dir) / "state.json")
+            backend = FakeCrawlBackend()
+            service = build_service(backend, state_store=state_store)
+
+            await service.set_enabled(False)
+            restored = CrawlToolService(
+                backend=backend,
+                state_store=state_store,
+                default_enabled=True,
+                token_configured=False,
+                default_timeout_ms=30_000,
+                max_timeout_ms=60_000,
+                max_concurrency=1,
+                max_queue=1,
+                max_redirects=5,
+                max_response_bytes=2_000_000,
+                max_html_bytes=8 * 1024 * 1024,
+                policy=PublicURLPolicy(resolver=public_resolver),
+            )
+            self.assertFalse(restored.status().enabled)
+
+            enabled = await restored.set_enabled(True)
+            self.assertEqual(enabled.state, "ready")
+            self.assertEqual(backend.preflight_calls, 1)
+            self.assertTrue(state_store.load_enabled(False))
 
 
 class CrawlMarkdownSafetyTests(unittest.TestCase):
@@ -289,6 +347,9 @@ class FakeAPIService:
             "status_code": 200,
             "rendered": True,
         }
+
+    async def set_enabled(self, enabled: bool) -> dict:
+        return {"id": "crawl4ai", "enabled": enabled}
 
 
 class CrawlToolAPITests(unittest.TestCase):
@@ -355,6 +416,34 @@ class CrawlToolAPITests(unittest.TestCase):
         for response in responses:
             self.assertEqual(response.status_code, 400)
             self.assertEqual(response.json()["error"]["code"], "invalid_request")
+
+    def test_control_header_is_required_for_toggle_and_dashboard_test(self) -> None:
+        client = self.build_client()
+
+        denied_toggle = client.put(
+            "/api/v1/tools/crawl/enabled",
+            json={"enabled": False},
+        )
+        denied_test = client.post(
+            "/api/v1/tools/crawl/test",
+            json={"url": "https://example.com/"},
+        )
+        allowed_toggle = client.put(
+            "/api/v1/tools/crawl/enabled",
+            headers={"X-FruitSpy-Control": "1"},
+            json={"enabled": False},
+        )
+        allowed_test = client.post(
+            "/api/v1/tools/crawl/test",
+            headers={"X-FruitSpy-Control": "1"},
+            json={"url": "https://example.com/"},
+        )
+
+        self.assertEqual(denied_toggle.status_code, 403)
+        self.assertEqual(denied_test.status_code, 403)
+        self.assertEqual(allowed_toggle.status_code, 200)
+        self.assertFalse(allowed_toggle.json()["enabled"])
+        self.assertEqual(allowed_test.status_code, 200)
 
 
 class CrawlToolConfigTests(unittest.TestCase):

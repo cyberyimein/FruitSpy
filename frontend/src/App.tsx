@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import ConnectionIndicator from './components/ConnectionIndicator';
 import ContainerPanel from './components/ContainerPanel';
+import CrawlToolPanel from './components/CrawlToolPanel';
 import HostDashboard from './components/HostDashboard';
 import PackageInventoryPanel from './components/PackageInventoryPanel';
 import PythonToolPanel from './components/PythonToolPanel';
@@ -144,7 +145,12 @@ export default function App() {
                         controlEnabled={config.container_control_enabled}
                     />
                 )}
-                {activePage === 'api' && <PythonToolPanel />}
+                {activePage === 'api' && (
+                    <>
+                        <PythonToolPanel />
+                        <CrawlToolPanel />
+                    </>
+                )}
             </main>
         </div>
     );
@@ -159,7 +165,7 @@ function PageHero({
         host: { eyebrow: 'Live monitor', title: 'Host' },
         packages: { eyebrow: 'Inventory', title: 'Packages' },
         containers: { eyebrow: 'Runtime monitor', title: 'Containers' },
-        api: { eyebrow: 'Planned relay', title: 'AI API Relay' },
+        api: { eyebrow: 'Tool relays', title: 'Agent Tools' },
     };
 
     return (
