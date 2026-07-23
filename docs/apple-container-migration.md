@@ -1,6 +1,12 @@
 # Apple Container Migration
 
-This guide moves workloads from Colima to Apple container.
+> **Historical migration reference only.** FruitSpy now uses Apple Container exclusively.
+> For current operations, use the Apple `container` CLI with the configured
+> `CONTAINER_APP_ROOT`. Do not use Docker or Colima to inspect or manage containers shown by
+> FruitSpy; those runtimes have separate container stores.
+
+This guide records the one-time migration of legacy workloads from Colima to Apple Container.
+It is retained only for installations that have not completed that migration.
 
 ## Move Apple Container Data To An External SSD
 
@@ -136,19 +142,20 @@ service:
 container exec hanamicli-app hanamicli --help
 ```
 
-## 4. Retire Colima
+## 4. Historical One-Time Colima Retirement
 
-After all required services have been verified, stop Colima and remove it separately if no
-remaining workload needs it:
+The following commands applied only during the original migration. They are not part of current
+FruitSpy operation. On a legacy installation, after all required services have been verified,
+stop the old runtime:
 
 ```bash
 docker stop portainer
 colima stop
 ```
 
-Apple container 1.0 does not provide Docker Compose or Docker restart policies. FruitSpy can
-show status and metrics, start, stop, restart, and read logs for Apple containers. Install the
-included login agent to restore the Apple container system, KabuMemo, and FruitSpy after login:
+FruitSpy can show status and metrics, start, stop, restart, and read logs for Apple containers.
+Install the included login agent to restore the Apple Container system, KabuMemo, and FruitSpy
+after login:
 
 ```bash
 cd /path/to/FruitSpy/scripts

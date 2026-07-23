@@ -174,16 +174,19 @@ Container controls are disabled in the committed template because FruitSpy curre
 authentication and listens on the LAN. Enable them only on a trusted network. Control requests
 are same-origin and require a FruitSpy-specific header to reduce cross-site request risk.
 
-## Moving Off Colima
+## Container Runtime
 
-Apple container does not import Colima's Docker state. Recreate each workload with the Apple
-`container build`, `container create`, or `container run` commands, and copy persistent data
-before stopping Colima. Host bind mounts are the simplest migration path because the data
-remains directly accessible from macOS.
+FruitSpy uses Apple Container exclusively. Use the Apple `container` CLI for container status,
+logs, lifecycle operations, and image management. Do not use Docker or Colima to inspect or
+operate FruitSpy workloads; their container stores are separate and will not show the containers
+displayed by FruitSpy.
 
-FruitSpy itself no longer requires Docker Engine, the Docker socket, Docker Compose, or Portainer.
-See [docs/apple-container-migration.md](docs/apple-container-migration.md) for the migration
-commands for example workloads.
+FruitSpy does not require Docker Engine, the Docker socket, Docker Compose, Portainer, or Colima.
+The external Apple Container application-data root used by this installation is configured with
+`FRUITSPY_APPLE_CONTAINER_APP_ROOT`.
+
+The retained [Apple Container migration guide](docs/apple-container-migration.md) is historical
+reference for machines that have not yet migrated. It is not the current operations guide.
 
 ## Python Tool Relay
 
