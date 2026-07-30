@@ -16,6 +16,29 @@ class HostMetrics(BaseModel):
     storage_total_gb: float = 0.0
 
 
+class RoomClimateReading(BaseModel):
+    observed_at: float
+    observed_at_iso: str
+    device_id: str
+    temperature_c: float
+    humidity_percent: int
+    co2_ppm: int
+    battery_percent: Optional[int] = None
+    rssi: int
+
+
+class RoomClimateStatus(BaseModel):
+    state: Literal["scanning", "ready", "stale", "unavailable"]
+    reading: Optional[RoomClimateReading] = None
+    stale: bool = True
+    age_seconds: Optional[int] = None
+    interval_seconds: int = 300
+    scan_seconds: int = 45
+    last_attempt_at: Optional[float] = None
+    next_scan_at: Optional[float] = None
+    error: Optional[str] = None
+
+
 class ContainerMetrics(BaseModel):
     id: str
     name: str
@@ -31,6 +54,7 @@ class ContainerMetrics(BaseModel):
 class Snapshot(BaseModel):
     timestamp: float
     host: HostMetrics
+    room_climate: RoomClimateStatus
     containers: list[ContainerMetrics] = Field(default_factory=list)
     runtime_name: str
     runtime_available: bool = True
@@ -204,3 +228,19 @@ class CrawlToolStatus(BaseModel):
 
 class CrawlToolEnableRequest(BaseModel):
     enabled: bool
+
+
+class RoomClimateMcpStatus(BaseModel):
+    schema_version: int = 1
+    id: str = "room-climate-mcp"
+    name: str = "Room Climate MCP"
+    tool_name: str = "get_room_climate"
+    protocol_mode: Literal["modern", "legacy"]
+    protocol_version: Literal["2026-07-28", "2025-11-25"]
+    endpoint: str = "/api/v1/tools/room-climate/mcp"
+    authentication_configured: bool
+    climate: RoomClimateStatus
+
+
+class RoomClimateMcpModeRequest(BaseModel):
+    protocol_mode: Literal["modern", "legacy"]

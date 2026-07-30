@@ -44,6 +44,11 @@ class RuntimeConfig:
     crawl_max_html_bytes: int
     crawl_base_directory: str
     crawl_tool_state_path: str
+    room_climate_interval_seconds: int
+    room_climate_scan_seconds: int
+    room_climate_device_id: str
+    room_climate_mcp_token: str
+    room_climate_mcp_state_path: str
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -184,6 +189,18 @@ def load_runtime_config() -> RuntimeConfig:
         "FRUITSPY_CRAWL_TOOL_STATE_PATH",
         str(config_data.get("crawl_tool_state_path", runtime_dir / "state.json")),
     )
+    room_climate_device_id = os.getenv(
+        "FRUITSPY_ROOM_CLIMATE_DEVICE_ID",
+        str(config_data.get("room_climate_device_id", "")),
+    ).strip()
+    room_climate_mcp_token = os.getenv(
+        "FRUITSPY_ROOM_CLIMATE_MCP_TOKEN",
+        str(config_data.get("room_climate_mcp_token", "")),
+    ).strip()
+    room_climate_mcp_state_path = os.getenv(
+        "FRUITSPY_ROOM_CLIMATE_MCP_STATE_PATH",
+        str(config_data.get("room_climate_mcp_state_path", runtime_dir / "state.json")),
+    )
 
     return RuntimeConfig(
         apple_container_cli=apple_container_cli,
@@ -323,4 +340,26 @@ def load_runtime_config() -> RuntimeConfig:
         ),
         crawl_base_directory=crawl_base_directory,
         crawl_tool_state_path=crawl_tool_state_path,
+        room_climate_interval_seconds=max(
+            int_setting(
+                "FRUITSPY_ROOM_CLIMATE_INTERVAL_SECONDS",
+                "room_climate_interval_seconds",
+                300,
+            ),
+            60,
+        ),
+        room_climate_scan_seconds=min(
+            max(
+                int_setting(
+                    "FRUITSPY_ROOM_CLIMATE_SCAN_SECONDS",
+                    "room_climate_scan_seconds",
+                    45,
+                ),
+                5,
+            ),
+            120,
+        ),
+        room_climate_device_id=room_climate_device_id,
+        room_climate_mcp_token=room_climate_mcp_token,
+        room_climate_mcp_state_path=room_climate_mcp_state_path,
     )

@@ -20,5 +20,7 @@
     <string>26.0</string>
     <key>NSHighResolutionCapable</key>
     <true/>
+    <key>NSBluetoothAlwaysUsageDescription</key>
+    <string>FruitSpy reads local room climate broadcasts from your Bluetooth sensor.</string>
 </dict>
 </plist>

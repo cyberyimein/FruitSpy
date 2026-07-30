@@ -24,6 +24,7 @@ from app.models.schemas import (
     CrawlToolLimits,
     CrawlToolStatus,
 )
+from app.services.shared_state import JsonStateFile
 
 logger = logging.getLogger("fruitspy.crawl")
 
@@ -82,33 +83,15 @@ class CrawlToolDisabledError(CrawlToolError):
 
 class CrawlToolStateStore:
     def __init__(self, path: str | Path) -> None:
-        self.path = Path(path).expanduser()
+        self._state = JsonStateFile(path)
+        self.path = self._state.path
 
     def load_enabled(self, default: bool) -> bool:
-        try:
-            payload = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return default
-        value = payload.get("crawl_tool_enabled") if isinstance(payload, dict) else None
+        value = self._state.read().get("crawl_tool_enabled")
         return value if isinstance(value, bool) else default
 
     def save_enabled(self, enabled: bool) -> None:
-        payload: dict[str, Any] = {}
-        try:
-            current = json.loads(self.path.read_text(encoding="utf-8"))
-            if isinstance(current, dict):
-                payload.update(current)
-        except (OSError, json.JSONDecodeError):
-            pass
-
-        payload["crawl_tool_enabled"] = enabled
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        temp_path = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
-        temp_path.write_text(
-            json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-            encoding="utf-8",
-        )
-        os.replace(temp_path, self.path)
+        self._state.set("crawl_tool_enabled", enabled)
 
 
 async def _system_resolver(hostname: str) -> Sequence[str]:

@@ -8,6 +8,29 @@ export type HostMetrics = {
     storage_total_gb: number;
 };
 
+export type RoomClimateReading = {
+    observed_at: number;
+    observed_at_iso: string;
+    device_id: string;
+    temperature_c: number;
+    humidity_percent: number;
+    co2_ppm: number;
+    battery_percent: number | null;
+    rssi: number;
+};
+
+export type RoomClimateStatus = {
+    state: 'scanning' | 'ready' | 'stale' | 'unavailable';
+    reading: RoomClimateReading | null;
+    stale: boolean;
+    age_seconds: number | null;
+    interval_seconds: number;
+    scan_seconds: number;
+    last_attempt_at: number | null;
+    next_scan_at: number | null;
+    error: string | null;
+};
+
 export type ContainerMetrics = {
     id: string;
     name: string;
@@ -23,6 +46,7 @@ export type ContainerMetrics = {
 export type Snapshot = {
     timestamp: number;
     host: HostMetrics;
+    room_climate: RoomClimateStatus;
     containers: ContainerMetrics[];
     runtime_name: string;
     runtime_available: boolean;
@@ -135,4 +159,16 @@ export type CrawlResult = {
         links_seen: number;
     };
     warnings: string[];
+};
+
+export type RoomClimateMcpStatus = {
+    schema_version: number;
+    id: string;
+    name: string;
+    tool_name: string;
+    protocol_mode: 'modern' | 'legacy';
+    protocol_version: '2026-07-28' | '2025-11-25';
+    endpoint: string;
+    authentication_configured: boolean;
+    climate: RoomClimateStatus;
 };

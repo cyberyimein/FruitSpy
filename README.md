@@ -12,6 +12,7 @@ FruitSpy is a lightweight macOS host and Apple container dashboard for LAN use.
 - A local Python Tool relay that executes Anomalo requests from loopback or an allowlisted container network
 - Optional short-lived `/tmp` artifact downloads for plots and small result files
 - A controlled Crawl4AI endpoint that renders public JavaScript pages into Markdown for Anomalo
+- A host-side SwitchBot room climate monitor with a read-only, dual-protocol MCP tool
 
 ## Architecture
 
@@ -131,6 +132,11 @@ The menu bar app provides:
 - `FRUITSPY_CRAWL_MAX_RESPONSE_BYTES` (default `2000000`)
 - `FRUITSPY_CRAWL_MAX_HTML_BYTES` (default `8388608`)
 - `FRUITSPY_CRAWL_BASE_DIRECTORY` (default `runtime/crawl`)
+- `FRUITSPY_ROOM_CLIMATE_INTERVAL_SECONDS` (default `300`; scan start interval)
+- `FRUITSPY_ROOM_CLIMATE_SCAN_SECONDS` (default `45`; BLE receive window)
+- `FRUITSPY_ROOM_CLIMATE_DEVICE_ID` (optional macOS CoreBluetooth device UUID)
+- `FRUITSPY_ROOM_CLIMATE_MCP_TOKEN` (optional Bearer token for the MCP endpoint)
+- `FRUITSPY_ROOM_CLIMATE_MCP_STATE_PATH` (defaults to shared runtime `state.json`)
 
 ## Config Files
 
@@ -169,6 +175,11 @@ Optional keys in config JSON:
 - `crawl_max_html_bytes`
 - `crawl_base_directory`
 - `crawl_tool_state_path` (defaults to the shared runtime `state.json`)
+- `room_climate_interval_seconds`
+- `room_climate_scan_seconds`
+- `room_climate_device_id`
+- `room_climate_mcp_token`
+- `room_climate_mcp_state_path` (stores the protocol-mode preference only)
 
 Container controls are disabled in the committed template because FruitSpy currently has no
 authentication and listens on the LAN. Enable them only on a trusted network. Control requests
@@ -210,6 +221,17 @@ The build and development scripts install the pinned Crawl4AI package and its Ch
 Use Python 3.10–3.13; the scripts prefer 3.13 and reject unsupported Python versions. See
 [docs/crawl-tool-api.md](docs/crawl-tool-api.md) for the API contract, configuration, and Anomalo
 setup.
+
+## Room Climate MCP
+
+FruitSpy samples a SwitchBot Meter Pro CO2 advertisement on the macOS host every
+five minutes. It retains only the latest reading in memory and shows it in the
+separate Room section of the Host page.
+
+The API page exposes the `get_room_climate` tool at
+`/api/v1/tools/room-climate/mcp`. Its protocol selector defaults to modern MCP
+`2026-07-28` and can switch the endpoint to legacy MCP `2025-11-25`. See
+[docs/room-climate-mcp.md](docs/room-climate-mcp.md) for wire-level examples.
 
 ## Notes
 

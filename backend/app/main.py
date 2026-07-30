@@ -11,6 +11,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api.crawl_tool import create_crawl_tool_router
 from app.api.python_tool import create_python_tool_router
+from app.api.room_climate_mcp import create_room_climate_mcp_router
 from app.config import load_runtime_config
 from app.models.schemas import PackageInventory, Snapshot
 from app.services.apple_container_runtime import AppleContainerRuntime
@@ -21,6 +22,11 @@ from app.services.python_tool import (
     ApplePythonSandboxRunner,
     PythonToolService,
     PythonToolStateStore,
+)
+from app.services.room_climate import RoomClimateService
+from app.services.room_climate_mcp import (
+    RoomClimateMcpService,
+    RoomClimateMcpStateStore,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -91,12 +97,30 @@ crawl_tool_service = CrawlToolService(
     max_response_bytes=RUNTIME_CONFIG.crawl_max_response_bytes,
     max_html_bytes=RUNTIME_CONFIG.crawl_max_html_bytes,
 )
+room_climate_service = RoomClimateService(
+    interval_seconds=RUNTIME_CONFIG.room_climate_interval_seconds,
+    scan_seconds=RUNTIME_CONFIG.room_climate_scan_seconds,
+    device_id=RUNTIME_CONFIG.room_climate_device_id,
+)
+room_climate_mcp_service = RoomClimateMcpService(
+    climate=room_climate_service,
+    state_store=RoomClimateMcpStateStore(
+        RUNTIME_CONFIG.room_climate_mcp_state_path,
+    ),
+    authentication_configured=bool(RUNTIME_CONFIG.room_climate_mcp_token),
+)
 
 app = FastAPI(title="FruitSpy")
 app.include_router(
     create_crawl_tool_router(
         service=crawl_tool_service,
         token=RUNTIME_CONFIG.crawl_api_token,
+    )
+)
+app.include_router(
+    create_room_climate_mcp_router(
+        service=room_climate_mcp_service,
+        token=RUNTIME_CONFIG.room_climate_mcp_token,
     )
 )
 app.include_router(
@@ -118,12 +142,24 @@ async def initialize_crawl_tool() -> None:
     await crawl_tool_service.initialize()
 
 
+@app.on_event("startup")
+async def initialize_room_climate() -> None:
+    room_climate_mcp_service.initialize()
+    room_climate_service.start()
+
+
+@app.on_event("shutdown")
+async def shutdown_room_climate() -> None:
+    await room_climate_service.stop()
+
+
 def collect_snapshot() -> Snapshot:
     host = host_service.collect()
     containers, runtime_available, runtime_error = container_service.collect()
     return Snapshot(
         timestamp=time.time(),
         host=host,
+        room_climate=room_climate_service.status(),
         containers=containers,
         runtime_name=container_service.display_name,
         runtime_available=runtime_available,

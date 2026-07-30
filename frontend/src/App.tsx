@@ -5,6 +5,7 @@ import CrawlToolPanel from './components/CrawlToolPanel';
 import HostDashboard from './components/HostDashboard';
 import PackageInventoryPanel from './components/PackageInventoryPanel';
 import PythonToolPanel from './components/PythonToolPanel';
+import RoomClimateMcpPanel from './components/RoomClimateMcpPanel';
 import { DashboardSocket, type ConnectionState } from './lib/socket';
 import type { RuntimeConfig, Snapshot } from './lib/types';
 
@@ -28,6 +29,17 @@ const EMPTY_SNAPSHOT: Snapshot = {
         storage_percent: 0,
         storage_used_gb: 0,
         storage_total_gb: 0,
+    },
+    room_climate: {
+        state: 'stale',
+        reading: null,
+        stale: true,
+        age_seconds: null,
+        interval_seconds: 300,
+        scan_seconds: 45,
+        last_attempt_at: null,
+        next_scan_at: null,
+        error: null,
     },
     containers: [],
     runtime_name: 'Apple container',
@@ -134,7 +146,9 @@ export default function App() {
             <main className="dashboard-main">
                 <PageHero page={activePage} />
 
-                {activePage === 'host' && <HostDashboard host={snapshot.host} />}
+                {activePage === 'host' && (
+                    <HostDashboard host={snapshot.host} roomClimate={snapshot.room_climate} />
+                )}
                 {activePage === 'packages' && <PackageInventoryPanel host={snapshot.host} updatedAt={updatedAt} />}
                 {activePage === 'containers' && (
                     <ContainerPanel
@@ -149,6 +163,7 @@ export default function App() {
                     <>
                         <PythonToolPanel />
                         <CrawlToolPanel />
+                        <RoomClimateMcpPanel />
                     </>
                 )}
             </main>
